@@ -796,10 +796,18 @@ async function savePicks(phase) {
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
+    // Send ALL current picks for this phase (not just pending changes)
+    // so the server knows which picks to keep vs delete
     const toSave = {};
+    for (const [slot, team] of Object.entries(picks)) {
+        if (phaseForSlot(slot) === phase && team) {
+            toSave[slot] = team.id;
+        }
+    }
+    // Also include pending deletes (null values = cleared picks)
     for (const [slot, val] of Object.entries(pendingPicks)) {
-        if (val !== null) {
-            toSave[slot] = val;
+        if (val === null && phaseForSlot(slot) === phase) {
+            delete toSave[slot];
         }
     }
 

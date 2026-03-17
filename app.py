@@ -281,6 +281,8 @@ def index():
 @login_required
 def bracket():
     user = get_current_user()
+    pick_count = Pick.query.filter_by(user_id=user.id).count()
+    app.logger.info(f"[BRACKET LOAD] user={user.name} (id={user.id}), picks_in_db={pick_count}, session_user_id={session.get('user_id')}")
     state = build_bracket_state(user.id)
     alive_teams = get_alive_teams() if phase2_open() else {}
 
@@ -362,6 +364,16 @@ def save_picks():
             db.session.delete(existing)
 
     db.session.commit()
+
+    # Verify the commit actually persisted
+    saved_count = Pick.query.filter_by(user_id=user.id).count()
+    phase_pick_count = len([s for s in phase_slots if picks_data.get(s)])
+    deleted_count = len(phase_slots) - phase_pick_count
+    app.logger.info(
+        f"[SAVE] user={user.name} (id={user.id}), phase={phase}, "
+        f"submitted={len(picks_data)}, saved={phase_pick_count}, "
+        f"deleted={deleted_count}, total_in_db={saved_count}"
+    )
     return jsonify({"ok": True})
 
 
