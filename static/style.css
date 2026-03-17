@@ -532,7 +532,7 @@ button:disabled {
     transition: opacity 0.15s;
 }
 
-.game-team.picked:hover .clear-pick {
+.game-team:hover .clear-pick {
     opacity: 1;
 }
 

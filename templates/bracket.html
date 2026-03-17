@@ -561,29 +561,33 @@ function pickTeam(el) {
 function unpickTeam(slot) {
     // Undo: deselect a pick and cascade-clear downstream
     const oldPick = picks[slot];
-    if (!oldPick) return;
 
     const phase = phaseForSlot(slot);
     if (!PHASE1_OPEN && !PHASE2_OPEN) return;
     if (phase === 1 && !PHASE1_OPEN) return;
     if (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN) return;
 
-    // Clear this pick
-    delete picks[slot];
-    pendingPicks[slot] = null;
-    hasChanges = true;
+    if (oldPick) {
+        // Clear this pick
+        delete picks[slot];
+        pendingPicks[slot] = null;
+        hasChanges = true;
 
-    // Clear pick styling
-    document.querySelectorAll(`[data-slot="${slot}"]`).forEach(el => {
-        el.classList.remove('picked');
-    });
+        // Clear pick styling
+        document.querySelectorAll(`[data-slot="${slot}"]`).forEach(el => {
+            el.classList.remove('picked');
+        });
 
-    showSaveBar();
+        showSaveBar();
 
-    // Cascade-clear downstream
-    cascadeClear(slot, oldPick.id);
+        // Cascade-clear downstream
+        cascadeClear(slot, oldPick.id);
+    }
 
-    // Re-render the parent slot to remove the team if it was propagated
+    // Re-render this slot (removes propagated team display if feeder pick was cleared)
+    renderGameSlot(slot);
+
+    // Re-render parent slot to remove propagated team upstream
     const feed = FEEDS_INTO[slot];
     if (feed) {
         renderGameSlot(feed.parent);
@@ -701,7 +705,7 @@ function renderGameSlot(slot) {
             const pickedClass = isPicked ? 'picked' : '';
             const correctClass = isCorrect ? 'correct' : '';
             const wrongClass = isWrong ? 'wrong' : '';
-            const clearBtn = isPicked && !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
+            const clearBtn = !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
 
             // Actual winner display for wrong picks
             let actualWinnerHtml = '';
@@ -803,13 +807,16 @@ async function savePicks(phase) {
     }
 }
 
-// Add X buttons to server-rendered picked teams on page load
-document.querySelectorAll('.game-team.picked:not(.locked)').forEach(function(el) {
-    if (el.dataset.slot && !el.querySelector('.clear-pick')) {
+// Add X buttons to ALL server-rendered teams (picked or propagated) on page load
+document.querySelectorAll('.game-team:not(.locked)').forEach(function(el) {
+    if (el.dataset.slot && el.dataset.teamId && !el.querySelector('.clear-pick')) {
+        // Don't add X if this slot has a final result
+        const slot = el.dataset.slot;
+        if (RESULTS[slot] && RESULTS[slot].winner_id) return;
         const btn = document.createElement('span');
         btn.className = 'clear-pick';
         btn.innerHTML = '&times;';
-        btn.onclick = function(e) { clearPick(e, el.dataset.slot); };
+        btn.onclick = function(e) { clearPick(e, slot); };
         el.appendChild(btn);
     }
 });
