@@ -433,12 +433,23 @@
     </div><!-- /bracket-wrapper -->
 </div>
 
+<!-- Confirm clear overlay -->
+<div class="confirm-clear-overlay" id="confirm-clear" style="display: none;">
+    <div class="confirm-clear-box">
+        <span>Clear all picks?</span>
+        <div class="flex gap-8">
+            <button class="btn-danger" onclick="confirmClear()">Yes, clear</button>
+            <button onclick="cancelClear()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Save bar -->
 <div class="save-bar" id="save-bar" style="display: none;">
     <span class="status" id="save-status"></span>
     <div class="flex gap-8">
         {% if phase1_open or phase2_open %}
-        <button class="btn-danger" onclick="clearBracket()">Clear Bracket</button>
+        <button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>
         {% endif %}
         {% if phase1_open %}
         <button onclick="savePicks(1)" id="save-phase1-btn">Save R64 + R32</button>
@@ -606,9 +617,18 @@ function unpickTeam(slot) {
     }
 }
 
-function clearBracket() {
-    if (!confirm('Are you sure? This will clear all your picks.')) return;
+function showClearConfirm() {
+    document.getElementById('confirm-clear').style.display = 'flex';
+}
+function cancelClear() {
+    document.getElementById('confirm-clear').style.display = 'none';
+}
+function confirmClear() {
+    document.getElementById('confirm-clear').style.display = 'none';
+    clearBracket();
+}
 
+function clearBracket() {
     // Collect all picked slots, clear from leaves to roots
     const allSlots = Object.keys(picks);
     // Sort so deeper rounds (R64) come last — clear from championship down
