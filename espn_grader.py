@@ -39,8 +39,11 @@ ESPN_NAME_OVERRIDES = {
     "Prairie View A&M Panthers": "Prairie View A&M",
     "LIU Sharks": "LIU",
     "Long Island University": "LIU",
+    "Long Island University Sharks": "LIU",
     "Cal Baptist Lancers": "Cal Baptist",
     "California Baptist": "Cal Baptist",
+    "California Baptist Lancers": "Cal Baptist",
+    "CBU Lancers": "Cal Baptist",
     "Hawai'i Rainbow Warriors": "Hawaii",
     "Hawai'i": "Hawaii",
     "Hawaii Rainbow Warriors": "Hawaii",
@@ -49,6 +52,30 @@ ESPN_NAME_OVERRIDES = {
     "Utah St": "Utah State",
     "Kennesaw St": "Kennesaw State",
     "Wright St": "Wright State",
+    "Texas Tech Red Raiders": "Texas Tech",
+    "Akron Zips": "Akron",
+    "Arizona Wildcats": "Arizona",
+    "Kansas Jayhawks": "Kansas",
+    "UCF Knights": "UCF",
+    "BYU Cougars": "BYU",
+    "SMU Mustangs": "SMU",
+    "VCU Rams": "VCU",
+    "UAB Blazers": "UAB",
+    "UNLV Rebels": "UNLV",
+    "LSU Tigers": "LSU",
+    "USC Trojans": "USC",
+    "UCLA Bruins": "UCLA",
+    "Ole Miss Rebels": "Ole Miss",
+    "UNC Tar Heels": "North Carolina",
+    "North Carolina Tar Heels": "North Carolina",
+    "Michigan St.": "Michigan State",
+    "Michigan State Spartans": "Michigan State",
+    "Ohio St.": "Ohio State",
+    "Oregon St.": "Oregon State",
+    "Penn St.": "Penn State",
+    "San Diego St.": "San Diego State",
+    "Wichita St.": "Wichita State",
+    "Boise St.": "Boise State",
 }
 
 
@@ -82,9 +109,18 @@ def match_espn_team(espn_name, teams_by_name):
         if stripped in teams_by_name:
             return teams_by_name[stripped]
 
-    # Substring match as last resort
+    # Substring match as last resort (case-insensitive)
+    espn_lower = espn_name.lower()
     for name, team in teams_by_name.items():
-        if name in espn_name or espn_name in name:
+        name_lower = name.lower()
+        if name_lower in espn_lower or espn_lower in name_lower:
+            return team
+
+    # Try matching individual words (e.g. "Akron" in "Akron Zips")
+    espn_words = set(espn_lower.split())
+    for name, team in teams_by_name.items():
+        name_words = set(name.lower().split())
+        if name_words and name_words.issubset(espn_words):
             return team
 
     return None
@@ -181,8 +217,14 @@ def determine_game_slot(team1, team2, round_number, teams_by_name, existing_resu
         t2 = match_espn_team(team2["short_name"], teams_by_name)
 
     if not t1 or not t2:
+        unmatched = []
+        if not t1:
+            unmatched.append(f"'{team1['name']}' (short='{team1.get('short_name', '')}')")
+        if not t2:
+            unmatched.append(f"'{team2['name']}' (short='{team2.get('short_name', '')}')")
         logger.warning(
-            f"Could not match teams: {team1['name']} / {team2['name']}"
+            f"Could not match teams: {' AND '.join(unmatched)} "
+            f"(from {team1['name']} vs {team2['name']})"
         )
         return None, None, None
 
@@ -338,6 +380,14 @@ def poll_and_grade(app):
                 )
 
                 if not slot:
+                    logger.warning(
+                        f"UNMATCHED ESPN game: "
+                        f"'{t1_data['name']}' (short='{t1_data.get('short_name', '')}', "
+                        f"seed={t1_data['seed']}) vs "
+                        f"'{t2_data['name']}' (short='{t2_data.get('short_name', '')}', "
+                        f"seed={t2_data['seed']}) "
+                        f"[date={date_str}, status={game['status']}]"
+                    )
                     continue
 
                 # Populate live data for all games
