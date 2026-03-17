@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Admin - Bracket Pool{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Admin Panel</h1>
+
+    <!-- Phase Status -->
+    <div class="card">
+        <h2>Phase Status</h2>
+        <div class="flex gap-16" style="flex-wrap: wrap;">
+            <div>
+                <span class="phase-status {{ 'phase-open' if phase1_open else 'phase-locked' }}">
+                    Opening Weekend {{ 'Open' if phase1_open else 'Locked' }}
+                </span>
+                <span class="text-dim text-sm">Locks {{ phase1_lock.strftime('%b %d, %I:%M %p ET') }}</span>
+            </div>
+            <div>
+                <span class="phase-status {{ 'phase-open' if phase2_open else 'phase-locked' }}">
+                    Rest of the Way {{ 'Open' if phase2_open else 'Locked' }}
+                </span>
+                <span class="text-dim text-sm">Locks {{ phase2_lock.strftime('%b %d, %I:%M %p ET') }}</span>
+            </div>
+            <div class="text-dim text-sm">Now: {{ now.strftime('%b %d, %I:%M %p ET') }}</div>
+        </div>
+    </div>
+
+    <div class="admin-grid">
+        <!-- Record Result -->
+        <div class="card">
+            <h2>Record Game Result</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="record_result">
+                <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+
+                <label>Game Slot</label>
+                <select name="game_slot" required>
+                    <option value="">Select slot...</option>
+                    {% for slot in slots %}
+                    <option value="{{ slot }}" {{ 'disabled' if slot in results }}>
+                        {{ slot }}{{ ' (done)' if slot in results else '' }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <label>Team 1</label>
+                <select name="team1_id" id="admin-team1" required>
+                    <option value="">Select team...</option>
+                    {% for tid, t in teams.items() %}
+                    <option value="{{ t.id }}" data-seed="{{ t.seed }}">
+                        ({{ t.seed }}) {{ t.name }} - {{ t.region }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <label>Team 1 Seed</label>
+                <input type="text" name="team1_seed" id="admin-t1-seed" required>
+
+                <label>Team 2</label>
+                <select name="team2_id" id="admin-team2" required>
+                    <option value="">Select team...</option>
+                    {% for tid, t in teams.items() %}
+                    <option value="{{ t.id }}" data-seed="{{ t.seed }}">
+                        ({{ t.seed }}) {{ t.name }} - {{ t.region }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <label>Team 2 Seed</label>
+                <input type="text" name="team2_seed" id="admin-t2-seed" required>
+
+                <label>Winner</label>
+                <select name="winner_id" required>
+                    <option value="">Select winner...</option>
+                    {% for tid, t in teams.items() %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="mt-8">Record Result</button>
+            </form>
+        </div>
+
+        <!-- Existing Results -->
+        <div class="card">
+            <h2>Recorded Results</h2>
+            <div style="max-height: 500px; overflow-y: auto;">
+                {% for slot, r in results.items() %}
+                <div class="flex justify-between items-center mb-8" style="padding: 4px 0; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <span class="text-dim text-sm">{{ slot }}</span><br>
+                        {{ teams[r.team1_id].name }} ({{ r.team1_seed }}) vs {{ teams[r.team2_id].name }} ({{ r.team2_seed }})<br>
+                        <strong>Winner: {{ teams[r.winner_id].name if r.winner_id else 'TBD' }}</strong>
+                    </div>
+                    <form method="POST" style="display: inline;">
+                        <input type="hidden" name="action" value="delete_result">
+                        <input type="hidden" name="game_slot" value="{{ slot }}">
+                        <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                        <button type="submit" class="btn-danger btn-sm">Delete</button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="text-dim">No results recorded yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="card mt-16">
+        <h2>Leaderboard</h2>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th class="text-right">Correct</th>
+                    <th class="text-right">Round</th>
+                    <th class="text-right">Bonus</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in board %}
+                <tr>
+                    <td class="rank">{{ entry.rank }}</td>
+                    <td>{{ entry.name }}</td>
+                    <td class="text-right">{{ entry.correct_picks }}</td>
+                    <td class="text-right">{{ entry.round_points }}</td>
+                    <td class="text-right">{{ entry.bonus_points }}</td>
+                    <td class="text-right total">{{ entry.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- All Users' Picks -->
+    <div class="card mt-16">
+        <h2>All Picks</h2>
+        {% for u in users %}
+        <div class="admin-section">
+            <h3>{{ u.name }}</h3>
+            {% if all_picks.get(u.id) %}
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table class="admin-picks-table">
+                    <thead>
+                        <tr><th>Slot</th><th>Pick</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for slot, team_id in all_picks[u.id].items() | sort %}
+                        <tr>
+                            <td class="text-dim">{{ slot }}</td>
+                            <td>{{ teams[team_id].name if team_id in teams else 'Unknown' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <span class="text-dim text-sm">No picks yet.</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Auto-fill seed when team is selected
+document.getElementById('admin-team1').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('admin-t1-seed').value = opt.dataset.seed || '';
+});
+document.getElementById('admin-team2').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('admin-t2-seed').value = opt.dataset.seed || '';
+});
+</script>
+{% endblock %}

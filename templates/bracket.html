@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+{% block title %}My Bracket - Bracket Pool{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Phase status bar -->
+    <div class="phase-bar">
+        <div>
+            <span class="phase-status {{ 'phase-open' if phase1_open else 'phase-locked' }}">
+                Opening Weekend {{ 'Open' if phase1_open else 'Locked' }}
+            </span>
+            <span class="phase-info">R64 through Championship</span>
+            {% if phase1_open %}
+            <span class="countdown" data-deadline="{{ phase1_lock.isoformat() }}"></span>
+            {% endif %}
+        </div>
+        <div>
+            {% if phase2_open %}
+            <span class="phase-status phase-open">Rest of the Way Open</span>
+            <span class="phase-info">S16 - Championship</span>
+            <span class="countdown" data-deadline="{{ phase2_lock.isoformat() }}"></span>
+            {% elif now < phase2_unlock %}
+            <span class="phase-status phase-upcoming">Rest of the Way Upcoming</span>
+            <span class="phase-info">Opens {{ phase2_unlock.strftime('%b %d, %I:%M %p ET') }}</span>
+            {% else %}
+            <span class="phase-status phase-locked">Rest of the Way Locked</span>
+            <span class="phase-info">S16 - Championship</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Regions -->
+    <div id="bracket-wrapper">
+    {% for region in regions %}
+    <div class="bracket-region">
+        <div class="region-header">{{ region | upper }}</div>
+        <div class="bracket-container">
+            <div class="bracket-grid">
+                <!-- R64 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Round of 64</div>
+                    {% for i in range(1, 9) %}
+                    {% set slot = region ~ '_r64_' ~ i %}
+                    {% set game = state.r64.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% if game.team1 %}
+                        <div class="game-team {{ 'picked' if game.pick == game.team1.id else '' }} {{ 'correct' if game.result and game.result.winner_id == game.team1.id and game.pick == game.team1.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != game.team1.id and game.pick == game.team1.id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ game.team1.id }}"
+                             data-seed="{{ game.team1.seed }}"
+                             data-name="{{ game.team1.name }}"
+                             data-phase="1"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ game.team1.seed }}</span>
+                            <span class="name">{{ game.team1.name }}</span>
+                            {% if game.result and game.result.winner_id == game.team1.id %}
+                            <span class="result-indicator win">W</span>
+                            {% elif game.result and game.result.winner_id and game.result.winner_id != game.team1.id %}
+                            <span class="result-indicator loss">L</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {# First Four slot: show combined label or resolved winner #}
+                        {% if game.ff_slot %}
+                            {% set ff = state.first_four[game.ff_slot] %}
+                            {% if ff.result and ff.result.winner_id %}
+                                {# FF resolved: show the winner as the team #}
+                                {% set ff_winner = state.teams[ff.result.winner_id] %}
+                                <div class="game-team {{ 'picked' if game.pick == ff_winner.id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                                     data-slot="{{ slot }}"
+                                     data-team-id="{{ ff_winner.id }}"
+                                     data-seed="{{ ff_winner.seed }}"
+                                     data-name="{{ ff_winner.name }}"
+                                     data-phase="1"
+                                     onclick="pickTeam(this)">
+                                    <span class="seed">{{ ff_winner.seed }}</span>
+                                    <span class="name">{{ ff_winner.name }}</span>
+                                </div>
+                            {% else %}
+                                {# FF unresolved: show combined label as single entry #}
+                                {% set ff_names = [] %}
+                                {% set ff_id = ff.teams[0].id %}
+                                {% for t in ff.teams %}
+                                    {% if ff_names.append(t.name) %}{% endif %}
+                                {% endfor %}
+                                <div class="game-team {{ 'picked' if game.pick == ff_id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                                     data-slot="{{ slot }}"
+                                     data-team-id="{{ ff_id }}"
+                                     data-seed="{{ ff.teams[0].seed }}"
+                                     data-name="{{ ff_names | join('/') }}"
+                                     data-ff-slot="{{ game.ff_slot }}"
+                                     data-phase="1"
+                                     onclick="pickTeam(this)">
+                                    <span class="seed">{{ ff.teams[0].seed }}</span>
+                                    <span class="name">{{ ff_names | join('/') }}</span>
+                                </div>
+                            {% endif %}
+                        {% elif game.team2 %}
+                        <div class="game-team {{ 'picked' if game.pick == game.team2.id else '' }} {{ 'correct' if game.result and game.result.winner_id == game.team2.id and game.pick == game.team2.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != game.team2.id and game.pick == game.team2.id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ game.team2.id }}"
+                             data-seed="{{ game.team2.seed }}"
+                             data-name="{{ game.team2.name }}"
+                             data-phase="1"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ game.team2.seed }}</span>
+                            <span class="name">{{ game.team2.name }}</span>
+                            {% if game.result and game.result.winner_id == game.team2.id %}
+                            <span class="result-indicator win">W</span>
+                            {% elif game.result and game.result.winner_id and game.result.winner_id != game.team2.id %}
+                            <span class="result-indicator loss">L</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- R32 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Round of 32</div>
+                    {% for i in range(1, 5) %}
+                    {% set slot = region ~ '_r32_' ~ i %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'projected' if team.projected|default(false) else '' }} {{ 'locked' if not phase1_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="1"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- S16 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Sweet 16</div>
+                    {% for i in range(1, 3) %}
+                    {% set slot = region ~ '_s16_' ~ i %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="2"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- E8 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Elite 8</div>
+                    {% set slot = region ~ '_e8_1' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="2"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Final Four + Championship -->
+    <div class="final-four-section">
+        <div class="region-header">Final Four & Championship</div>
+        <div class="bracket-container">
+            <div class="final-four-grid">
+                <!-- F4 Game 1: East vs West -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Final Four</div>
+                    {% set slot = 'f4_1' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="2"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD (East/West)</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Championship -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Championship</div>
+                    {% set slot = 'championship' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="2"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- F4 Game 2: Midwest vs South -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Final Four</div>
+                    {% set slot = 'f4_2' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                    <div class="game" id="game-{{ slot }}">
+                        {% for team in [game.team1, game.team2] %}
+                        {% if team %}
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                             data-slot="{{ slot }}"
+                             data-team-id="{{ team.id }}"
+                             data-seed="{{ team.seed }}"
+                             data-name="{{ team.name }}"
+                             data-phase="2"
+                             onclick="pickTeam(this)">
+                            <span class="seed">{{ team.seed }}</span>
+                            <span class="name">{{ team.name }}</span>
+                        </div>
+                        {% else %}
+                        <div class="game-team locked" style="opacity: 0.3;">
+                            <span class="seed">-</span>
+                            <span class="name">TBD (MW/South)</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    </div><!-- /bracket-wrapper -->
+</div>
+
+<!-- Save bar -->
+<div class="save-bar" id="save-bar" style="display: none;">
+    <span class="status unsaved" id="save-status">Unsaved changes</span>
+    <div class="flex gap-8">
+        {% if phase1_open %}
+        <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
+        {% endif %}
+        {% if phase2_open %}
+        <button onclick="savePicks(2)" id="save-phase2-btn">Save Rest of the Way</button>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ALIVE_TEAM_IDS = new Set({{ alive_team_ids | tojson }});
+const PHASE1_OPEN = {{ 'true' if phase1_open else 'false' }};
+const PHASE2_OPEN = {{ 'true' if phase2_open else 'false' }};
+const RESULTS = {{ state.results | tojson }};
+
+// Bracket progression: parent_slot -> [child1_slot, child2_slot]
+const PROGRESSION = {};
+const REGIONS = ['east', 'west', 'midwest', 'south'];
+REGIONS.forEach(r => {
+    for (let i = 1; i <= 4; i++) {
+        PROGRESSION[`${r}_r32_${i}`] = [`${r}_r64_${2*i-1}`, `${r}_r64_${2*i}`];
+    }
+    for (let i = 1; i <= 2; i++) {
+        PROGRESSION[`${r}_s16_${i}`] = [`${r}_r32_${2*i-1}`, `${r}_r32_${2*i}`];
+    }
+    PROGRESSION[`${r}_e8_1`] = [`${r}_s16_1`, `${r}_s16_2`];
+});
+PROGRESSION['f4_1'] = ['east_e8_1', 'west_e8_1'];
+PROGRESSION['f4_2'] = ['midwest_e8_1', 'south_e8_1'];
+PROGRESSION['championship'] = ['f4_1', 'f4_2'];
+
+// Reverse lookup: child_slot -> { parent, position (0 or 1) }
+const FEEDS_INTO = {};
+for (const [parent, [child0, child1]] of Object.entries(PROGRESSION)) {
+    FEEDS_INTO[child0] = { parent, position: 0 };
+    FEEDS_INTO[child1] = { parent, position: 1 };
+}
+
+// Phase for each slot
+function phaseForSlot(slot) {
+    if (slot.startsWith('ff_') || slot.includes('_r64_') || slot.includes('_r32_')) return 1;
+    return 2;
+}
+
+// Track picks in memory: slot -> { id, name, seed }
+let picks = {};
+let pendingPicks = {};
+let hasChanges = false;
+
+// Initialize picks from server-rendered state
+document.querySelectorAll('.game-team.picked').forEach(el => {
+    if (el.dataset.teamId) {
+        picks[el.dataset.slot] = {
+            id: parseInt(el.dataset.teamId),
+            name: el.dataset.name,
+            seed: el.dataset.seed
+        };
+    }
+});
+
+function clearPick(e, slot) {
+    e.stopPropagation();
+    unpickTeam(slot);
+}
+
+function pickTeam(el) {
+    const slot = el.dataset.slot;
+    const teamId = parseInt(el.dataset.teamId);
+    const phase = parseInt(el.dataset.phase);
+
+    // During Opening Weekend: allow picking all rounds (R64 through Championship)
+    // During Rest of the Way: only allow picking S16+ from alive teams
+    // When both locked: no picks allowed
+    if (!PHASE1_OPEN && !PHASE2_OPEN) return;
+    if (phase === 1 && !PHASE1_OPEN) return;
+    if (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN) return;
+    if (phase === 2 && PHASE2_OPEN && ALIVE_TEAM_IDS.size > 0 && !ALIVE_TEAM_IDS.has(teamId)) return;
+
+    const oldPick = picks[slot];
+
+    // Clear previous pick styling and X buttons for this slot
+    document.querySelectorAll(`[data-slot="${slot}"]`).forEach(s => {
+        s.classList.remove('picked');
+        const oldX = s.querySelector('.clear-pick');
+        if (oldX) oldX.remove();
+    });
+
+    // Set new pick
+    el.classList.add('picked');
+    // Add X button
+    if (!el.querySelector('.clear-pick')) {
+        const btn = document.createElement('span');
+        btn.className = 'clear-pick';
+        btn.innerHTML = '&times;';
+        btn.onclick = function(e) { clearPick(e, slot); };
+        el.appendChild(btn);
+    }
+    const team = { id: teamId, name: el.dataset.name, seed: el.dataset.seed };
+    picks[slot] = team;
+    pendingPicks[slot] = teamId;
+    hasChanges = true;
+
+    showSaveBar();
+
+    // If pick changed, cascade-clear downstream picks that depended on old team
+    if (oldPick && oldPick.id !== teamId) {
+        cascadeClear(slot, oldPick.id);
+    }
+
+    // Propagate forward
+    propagatePick(slot, team);
+}
+
+function unpickTeam(slot) {
+    // Undo: deselect a pick and cascade-clear downstream
+    const oldPick = picks[slot];
+    if (!oldPick) return;
+
+    const phase = phaseForSlot(slot);
+    if (!PHASE1_OPEN && !PHASE2_OPEN) return;
+    if (phase === 1 && !PHASE1_OPEN) return;
+    if (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN) return;
+
+    // Clear this pick
+    delete picks[slot];
+    pendingPicks[slot] = null;
+    hasChanges = true;
+
+    // Clear pick styling
+    document.querySelectorAll(`[data-slot="${slot}"]`).forEach(el => {
+        el.classList.remove('picked');
+    });
+
+    showSaveBar();
+
+    // Cascade-clear downstream
+    cascadeClear(slot, oldPick.id);
+
+    // Re-render the parent slot to remove the team if it was propagated
+    const feed = FEEDS_INTO[slot];
+    if (feed) {
+        renderGameSlot(feed.parent);
+    }
+}
+
+function showSaveBar() {
+    document.getElementById('save-bar').style.display = 'flex';
+    document.getElementById('save-status').textContent = 'Unsaved changes';
+    document.getElementById('save-status').className = 'status unsaved';
+}
+
+function cascadeClear(slot, oldTeamId) {
+    const feed = FEEDS_INTO[slot];
+    if (!feed) return;
+
+    const parentSlot = feed.parent;
+    const parentPick = picks[parentSlot];
+
+    if (parentPick && parentPick.id === oldTeamId) {
+        delete picks[parentSlot];
+        pendingPicks[parentSlot] = null;
+
+        document.querySelectorAll(`[data-slot="${parentSlot}"]`).forEach(el => {
+            el.classList.remove('picked');
+        });
+
+        cascadeClear(parentSlot, oldTeamId);
+    }
+
+    renderGameSlot(parentSlot);
+}
+
+function propagatePick(slot, team) {
+    const feed = FEEDS_INTO[slot];
+    if (!feed) return;
+
+    renderGameSlot(feed.parent);
+}
+
+function renderGameSlot(slot) {
+    const gameEl = document.getElementById(`game-${slot}`);
+    if (!gameEl) return;
+
+    if (RESULTS[slot] && RESULTS[slot].winner_id) return;
+
+    const feeders = PROGRESSION[slot];
+    if (!feeders) return;
+
+    const phase = phaseForSlot(slot);
+
+    const teams = feeders.map(feederSlot => {
+        if (RESULTS[feederSlot] && RESULTS[feederSlot].winner_id) {
+            const winnerId = RESULTS[feederSlot].winner_id;
+            const el = document.querySelector(`[data-team-id="${winnerId}"]`);
+            if (el) return { id: winnerId, name: el.dataset.name, seed: el.dataset.seed };
+        }
+        if (picks[feederSlot]) return picks[feederSlot];
+        return null;
+    });
+
+    const currentPick = picks[slot];
+    const isLocked = (phase === 1 && !PHASE1_OPEN) || (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN);
+
+    let html = '';
+    for (let i = 0; i < 2; i++) {
+        const team = teams[i];
+        if (team) {
+            const isPicked = currentPick && currentPick.id === team.id;
+            const lockedClass = isLocked ? 'locked' : '';
+            const pickedClass = isPicked ? 'picked' : '';
+            const clearBtn = isPicked && !isLocked ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
+            html += `<div class="game-team ${pickedClass} ${lockedClass}"
+                          data-slot="${slot}"
+                          data-team-id="${team.id}"
+                          data-seed="${team.seed}"
+                          data-name="${team.name}"
+                          data-phase="${phase}"
+                          onclick="pickTeam(this)">
+                        <span class="seed">${team.seed}</span>
+                        <span class="name">${team.name}</span>
+                        ${clearBtn}
+                     </div>`;
+        } else {
+            html += `<div class="game-team locked" style="opacity: 0.3;">
+                        <span class="seed">-</span>
+                        <span class="name">TBD</span>
+                     </div>`;
+        }
+    }
+
+    gameEl.innerHTML = html;
+
+    if (currentPick) {
+        const stillValid = teams.some(t => t && t.id === currentPick.id);
+        if (!stillValid) {
+            delete picks[slot];
+            pendingPicks[slot] = null;
+            cascadeClear(slot, currentPick.id);
+        }
+    }
+
+    const feed = FEEDS_INTO[slot];
+    if (feed && picks[slot]) {
+        renderGameSlot(feed.parent);
+    }
+}
+
+async function savePicks(phase) {
+    const btn = document.getElementById(`save-phase${phase}-btn`);
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const toSave = {};
+    for (const [slot, val] of Object.entries(pendingPicks)) {
+        if (val !== null) {
+            toSave[slot] = val;
+        }
+    }
+
+    try {
+        const resp = await fetch('/bracket/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ picks: toSave, phase: phase }),
+        });
+
+        const data = await resp.json();
+
+        if (data.ok) {
+            document.getElementById('save-status').textContent = 'Saved';
+            document.getElementById('save-status').className = 'status';
+            hasChanges = false;
+            pendingPicks = {};
+        } else {
+            document.getElementById('save-status').textContent = data.error || 'Save failed';
+            document.getElementById('save-status').className = 'status unsaved';
+        }
+    } catch (e) {
+        document.getElementById('save-status').textContent = 'Network error';
+        document.getElementById('save-status').className = 'status unsaved';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = phase === 1 ? 'Save Bracket' : 'Save Rest of the Way';
+    }
+}
+
+// Add X buttons to server-rendered picked teams on page load
+document.querySelectorAll('.game-team.picked:not(.locked)').forEach(function(el) {
+    if (el.dataset.slot && !el.querySelector('.clear-pick')) {
+        const btn = document.createElement('span');
+        btn.className = 'clear-pick';
+        btn.innerHTML = '&times;';
+        btn.onclick = function(e) { clearPick(e, el.dataset.slot); };
+        el.appendChild(btn);
+    }
+});
+
+// Countdown timers
+function updateCountdowns() {
+    document.querySelectorAll('.countdown').forEach(el => {
+        const deadline = new Date(el.dataset.deadline);
+        const now = new Date();
+        const diff = deadline - now;
+
+        if (diff <= 0) {
+            el.textContent = 'LOCKED';
+            return;
+        }
+
+        const days = Math.floor(diff / 86400000);
+        const hours = Math.floor((diff % 86400000) / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+
+        let parts = [];
+        if (days > 0) parts.push(`${days}d`);
+        parts.push(`${hours}h ${minutes}m ${seconds}s`);
+        el.textContent = parts.join(' ');
+    });
+}
+
+updateCountdowns();
+setInterval(updateCountdowns, 1000);
+
+window.addEventListener('beforeunload', (e) => {
+    if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+document.getElementById('bracket-wrapper').oncontextmenu = function(e) { e.preventDefault(); return false; };
+</script>
+{% endblock %}

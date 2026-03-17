@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard - Bracket Pool{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Leaderboard</h1>
+
+    {% if board %}
+    <div class="card" style="padding: 0; overflow-x: auto;">
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th class="rank">#</th>
+                    <th>Name</th>
+                    <th class="text-right">Correct</th>
+                    <th class="text-right">Round Pts</th>
+                    <th class="text-right">Bonus Pts</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in board %}
+                <tr class="{{ 'you' if entry.user_id == user.id }}">
+                    <td class="rank">{{ entry.rank }}</td>
+                    <td class="name-col">{{ entry.name }}</td>
+                    <td class="text-right">{{ entry.correct_picks }}</td>
+                    <td class="text-right">{{ entry.round_points }}</td>
+                    <td class="text-right">{{ entry.bonus_points }}</td>
+                    <td class="text-right total">{{ entry.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card text-dim">No users yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

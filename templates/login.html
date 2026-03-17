@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Log In - Bracket Pool{% endblock %}
+
+{% block content %}
+<div class="container-narrow" style="margin-top: 80px;">
+    <div class="card">
+        <h1>Log In</h1>
+        <form method="POST">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" autocomplete="username" required autofocus>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+
+            <button type="submit" style="width: 100%; margin-top: 8px;">Log In</button>
+        </form>
+        <p class="text-dim text-sm mt-16">
+            Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

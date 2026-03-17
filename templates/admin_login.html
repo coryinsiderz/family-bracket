@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Admin Login - Bracket Pool{% endblock %}
+
+{% block content %}
+<div class="container-narrow" style="margin-top: 80px;">
+    <div class="card">
+        <h1>Admin</h1>
+        <form method="GET" action="{{ url_for('admin') }}">
+            <label for="pw">Password</label>
+            <input type="password" id="pw" name="pw" required autofocus>
+            <button type="submit" style="width: 100%; margin-top: 8px;">Enter</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

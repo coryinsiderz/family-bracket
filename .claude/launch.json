@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flask-dev",
+      "runtimeExecutable": "/Users/corybaltz/family-bracket/.venv/bin/python3",
+      "runtimeArgs": ["-m", "flask", "run", "--host", "0.0.0.0", "--port", "5050", "--debug"],
+      "port": 5050,
+      "env": {
+        "ENABLE_ESPN_POLL": "0",
+        "FLASK_APP": "app.py"
+      }
+    }
+  ]
+}
