@@ -362,10 +362,9 @@ def save_picks():
 @app.route("/leaderboard")
 @login_required
 def leaderboard():
-    if phase1_open():
-        return render_template("leaderboard.html", board=None, user=get_current_user(), locked=True)
+    locked = phase1_open()
     board = calculate_leaderboard()
-    return render_template("leaderboard.html", board=board, user=get_current_user(), locked=False)
+    return render_template("leaderboard.html", board=board, user=get_current_user(), locked=locked)
 
 
 # --- Admin ---

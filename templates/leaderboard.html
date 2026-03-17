@@ -5,9 +5,7 @@
 <div class="container">
     <h1>Leaderboard</h1>
 
-    {% if locked %}
-    <div class="card text-dim">Leaderboard available after tip-off.</div>
-    {% elif board %}
+    {% if board %}
     <div class="card" style="padding: 0; overflow-x: auto;">
         <table class="leaderboard-table">
             <thead>
@@ -15,27 +13,34 @@
                     <th class="rank">#</th>
                     <th>Name</th>
                     <th class="text-center">Paid</th>
+                    {% if not locked %}
                     <th class="text-right">Correct</th>
                     <th class="text-right">Round Pts</th>
                     <th class="text-right">Bonus Pts</th>
                     <th class="text-right">Total</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for entry in board %}
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
-                    <td class="rank">{{ entry.rank }}</td>
+                    <td class="rank">{{ loop.index if locked else entry.rank }}</td>
                     <td class="name-col">{{ entry.name }}</td>
                     <td class="text-center">{{ '&#10003;' if entry.paid else '' }}</td>
+                    {% if not locked %}
                     <td class="text-right">{{ entry.correct_picks }}</td>
                     <td class="text-right">{{ entry.round_points }}</td>
                     <td class="text-right">{{ entry.bonus_points }}</td>
                     <td class="text-right total">{{ entry.total }}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    {% if locked %}
+    <div class="card text-dim" style="margin-top: 12px;">Scores available after tip-off.</div>
+    {% endif %}
     {% else %}
     <div class="card text-dim">No users yet.</div>
     {% endif %}

@@ -13,9 +13,7 @@
         <div class="left">
             <span class="title">Baltz Bracket</span>
             <a href="{{ url_for('bracket') }}" class="{{ 'active' if request.endpoint == 'bracket' }}">Bracket</a>
-            {% if phase1_locked %}
             <a href="{{ url_for('leaderboard') }}" class="{{ 'active' if request.endpoint == 'leaderboard' }}">Leaderboard</a>
-            {% endif %}
         </div>
         <div class="right">
             <span>{{ user.name if user else '' }}</span>
