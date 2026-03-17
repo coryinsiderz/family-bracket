@@ -17,7 +17,7 @@ from bracket_data import (
     get_feeder_slots,
 )
 from scoring import calculate_user_score, calculate_leaderboard
-from espn_grader import poll_and_grade
+from espn_grader import poll_and_grade, LIVE_GAME_DATA
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +39,11 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+
+
+@app.context_processor
+def inject_globals():
+    return {"phase1_locked": now_et() >= PHASE1_LOCK}
 
 
 # --- Helpers ---
@@ -191,7 +196,10 @@ def build_bracket_state(user_id=None):
             "winner_id": r.winner_id,
             "team1_id": r.team1_id,
             "team2_id": r.team2_id,
+            "score_team1": r.score_team1,
+            "score_team2": r.score_team2,
         } for slot, r in results.items()},
+        "live": LIVE_GAME_DATA,
         "first_four": {
             ff_slot: {
                 "teams": [
@@ -354,8 +362,10 @@ def save_picks():
 @app.route("/leaderboard")
 @login_required
 def leaderboard():
+    if phase1_open():
+        return render_template("leaderboard.html", board=None, user=get_current_user(), locked=True)
     board = calculate_leaderboard()
-    return render_template("leaderboard.html", board=board, user=get_current_user())
+    return render_template("leaderboard.html", board=board, user=get_current_user(), locked=False)
 
 
 # --- Admin ---
@@ -471,6 +481,8 @@ def api_bracket():
 
 @app.route("/api/leaderboard")
 def api_leaderboard():
+    if phase1_open():
+        return jsonify({"error": "Leaderboard available after tip-off"}), 403
     return jsonify(calculate_leaderboard())
 
 
@@ -518,6 +530,14 @@ def start_scheduler():
 # Auto-create tables and start scheduler on first request
 with app.app_context():
     db.create_all()
+    # Migrate: add score columns if missing
+    try:
+        db.session.execute(db.text("ALTER TABLE game_results ADD COLUMN score_team1 INTEGER"))
+        db.session.execute(db.text("ALTER TABLE game_results ADD COLUMN score_team2 INTEGER"))
+        db.session.commit()
+        logger.info("Added score columns to game_results")
+    except Exception:
+        db.session.rollback()
     if Team.query.count() == 0:
         for name, seed, region, is_ff, ff_group in TEAMS:
             team = Team(

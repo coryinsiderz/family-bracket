@@ -57,6 +57,8 @@ class GameResult(db.Model):
     team2_seed = db.Column(db.Integer, nullable=False)
     winner_id = db.Column(db.Integer, db.ForeignKey("teams.id"), nullable=True)
     round_number = db.Column(db.Integer, nullable=False)
+    score_team1 = db.Column(db.Integer, nullable=True)
+    score_team2 = db.Column(db.Integer, nullable=True)
 
     team1 = db.relationship("Team", foreign_keys=[team1_id])
     team2 = db.relationship("Team", foreign_keys=[team2_id])

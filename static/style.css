@@ -333,7 +333,13 @@ button:disabled {
 
 .game-team.wrong {
     background: #2a1515;
-    opacity: 0.6;
+    opacity: 0.8;
+    border-left: 2px solid var(--red);
+}
+
+.game-team.wrong .name {
+    text-decoration: line-through;
+    opacity: 0.7;
 }
 
 .game-team.eliminated {
@@ -373,6 +379,40 @@ button:disabled {
 
 .game-team .result-indicator.loss {
     color: var(--red);
+}
+
+.game-team .score {
+    font-weight: 600;
+    color: var(--text-bright);
+    font-size: 12px;
+    min-width: 20px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.game-team .score.live-score {
+    color: var(--yellow);
+}
+
+.game-team .actual-winner {
+    color: var(--green);
+    font-size: 11px;
+    margin-left: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.game-info {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 2px 8px;
+    border-top: 1px solid var(--border);
+}
+
+.game-info.live-clock {
+    color: var(--yellow);
+    font-weight: 600;
 }
 
 /* First Four */

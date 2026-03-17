@@ -54,10 +54,14 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ game.team1.seed }}</span>
                             <span class="name">{{ game.team1.name }}</span>
-                            {% if game.result and game.result.winner_id == game.team1.id %}
-                            <span class="result-indicator win">W</span>
-                            {% elif game.result and game.result.winner_id and game.result.winner_id != game.team1.id %}
-                            <span class="result-indicator loss">L</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != game.team1.id and game.pick == game.team1.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score }}</span>
                             {% endif %}
                         </div>
                         {% endif %}
@@ -106,12 +110,23 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ game.team2.seed }}</span>
                             <span class="name">{{ game.team2.name }}</span>
-                            {% if game.result and game.result.winner_id == game.team2.id %}
-                            <span class="result-indicator win">W</span>
-                            {% elif game.result and game.result.winner_id and game.result.winner_id != game.team2.id %}
-                            <span class="result-indicator loss">L</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != game.team2.id and game.pick == game.team2.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team2_score }}</span>
                             {% endif %}
                         </div>
+                        {% endif %}
+                        {# Tip time for scheduled games #}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -137,6 +152,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -145,6 +171,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
@@ -169,6 +201,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -177,6 +220,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
@@ -200,6 +249,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -208,6 +268,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -230,7 +296,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -239,6 +305,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -247,6 +324,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -260,7 +343,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -269,6 +352,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -277,6 +371,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -290,7 +390,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -299,6 +399,17 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
+                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
+                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
+                            {% endif %}
+                            {% set live = state.live.get(slot) %}
+                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
+                            <span class="score">{{ game.result.score_team1 }}</span>
+                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
+                            <span class="score">{{ game.result.score_team2 }}</span>
+                            {% elif live and live.status == 'in_progress' %}
+                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -307,6 +418,12 @@
                         </div>
                         {% endif %}
                         {% endfor %}
+                        {% set live = state.live.get(slot) %}
+                        {% if live and live.status == 'scheduled' %}
+                        <div class="game-info">{{ live.tip_time }}</div>
+                        {% elif live and live.status == 'in_progress' and live.clock %}
+                        <div class="game-info live-clock">{{ live.clock }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -337,6 +454,8 @@ const ALIVE_TEAM_IDS = new Set({{ alive_team_ids | tojson }});
 const PHASE1_OPEN = {{ 'true' if phase1_open else 'false' }};
 const PHASE2_OPEN = {{ 'true' if phase2_open else 'false' }};
 const RESULTS = {{ state.results | tojson }};
+const LIVE_DATA = {{ state.live | tojson }};
+const TEAMS_DATA = {{ state.teams | tojson }};
 
 // Bracket progression: parent_slot -> [child1_slot, child2_slot]
 const PROGRESSION = {};
@@ -512,6 +631,8 @@ function renderGameSlot(slot) {
     if (!feeders) return;
 
     const phase = phaseForSlot(slot);
+    const result = RESULTS[slot];
+    const live = LIVE_DATA[slot];
 
     const teams = feeders.map(feederSlot => {
         if (RESULTS[feederSlot] && RESULTS[feederSlot].winner_id) {
@@ -531,10 +652,31 @@ function renderGameSlot(slot) {
         const team = teams[i];
         if (team) {
             const isPicked = currentPick && currentPick.id === team.id;
+            const isCorrect = result && result.winner_id === team.id && isPicked;
+            const isWrong = result && result.winner_id && result.winner_id !== team.id && isPicked;
             const lockedClass = isLocked ? 'locked' : '';
             const pickedClass = isPicked ? 'picked' : '';
-            const clearBtn = isPicked && !isLocked ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
-            html += `<div class="game-team ${pickedClass} ${lockedClass}"
+            const correctClass = isCorrect ? 'correct' : '';
+            const wrongClass = isWrong ? 'wrong' : '';
+            const clearBtn = isPicked && !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
+
+            // Actual winner display for wrong picks
+            let actualWinnerHtml = '';
+            if (isWrong && TEAMS_DATA[result.winner_id]) {
+                actualWinnerHtml = `<span class="actual-winner">${TEAMS_DATA[result.winner_id].name}</span>`;
+            }
+
+            // Score display
+            let scoreHtml = '';
+            const scoreKey = i === 0 ? 'score_team1' : 'score_team2';
+            const liveScoreKey = i === 0 ? 'team1_score' : 'team2_score';
+            if (result && result[scoreKey] != null) {
+                scoreHtml = `<span class="score">${result[scoreKey]}</span>`;
+            } else if (live && live.status === 'in_progress') {
+                scoreHtml = `<span class="score live-score">${live[liveScoreKey]}</span>`;
+            }
+
+            html += `<div class="game-team ${pickedClass} ${correctClass} ${wrongClass} ${lockedClass}"
                           data-slot="${slot}"
                           data-team-id="${team.id}"
                           data-seed="${team.seed}"
@@ -543,6 +685,8 @@ function renderGameSlot(slot) {
                           onclick="pickTeam(this)">
                         <span class="seed">${team.seed}</span>
                         <span class="name">${team.name}</span>
+                        ${actualWinnerHtml}
+                        ${scoreHtml}
                         ${clearBtn}
                      </div>`;
         } else {
@@ -551,6 +695,13 @@ function renderGameSlot(slot) {
                         <span class="name">TBD</span>
                      </div>`;
         }
+    }
+
+    // Tip time / live clock
+    if (live && live.status === 'scheduled' && live.tip_time) {
+        html += `<div class="game-info">${live.tip_time}</div>`;
+    } else if (live && live.status === 'in_progress' && live.clock) {
+        html += `<div class="game-info live-clock">${live.clock}</div>`;
     }
 
     gameEl.innerHTML = html;

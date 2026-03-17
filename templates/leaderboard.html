@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Leaderboard - Bracket Pool{% endblock %}
+{% block title %}Leaderboard - Baltz Bracket{% endblock %}
 
 {% block content %}
 <div class="container">
     <h1>Leaderboard</h1>
 
-    {% if board %}
+    {% if locked %}
+    <div class="card text-dim">Leaderboard available after tip-off.</div>
+    {% elif board %}
     <div class="card" style="padding: 0; overflow-x: auto;">
         <table class="leaderboard-table">
             <thead>
