@@ -435,8 +435,11 @@
 
 <!-- Save bar -->
 <div class="save-bar" id="save-bar" style="display: none;">
-    <span class="status unsaved" id="save-status">Unsaved changes</span>
+    <span class="status" id="save-status"></span>
     <div class="flex gap-8">
+        {% if phase1_open or phase2_open %}
+        <button class="btn-danger btn-sm" onclick="clearBracket()">Clear Bracket</button>
+        {% endif %}
         {% if phase1_open %}
         <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
         {% endif %}
@@ -585,6 +588,46 @@ function unpickTeam(slot) {
     if (feed) {
         renderGameSlot(feed.parent);
     }
+}
+
+function clearBracket() {
+    if (!confirm('Are you sure? This will clear all your picks.')) return;
+
+    // Collect all picked slots, clear from leaves to roots
+    const allSlots = Object.keys(picks);
+    // Sort so deeper rounds (R64) come last — clear from championship down
+    allSlots.sort((a, b) => {
+        const depth = s => {
+            if (s.includes('championship')) return 0;
+            if (s.includes('f4_')) return 1;
+            if (s.includes('_e8_')) return 2;
+            if (s.includes('_s16_')) return 3;
+            if (s.includes('_r32_')) return 4;
+            if (s.includes('_r64_')) return 5;
+            return 6;
+        };
+        return depth(a) - depth(b);
+    });
+
+    for (const slot of allSlots) {
+        delete picks[slot];
+        pendingPicks[slot] = null;
+    }
+    hasChanges = true;
+
+    // Clear all picked styling and X buttons
+    document.querySelectorAll('.game-team.picked').forEach(el => {
+        el.classList.remove('picked');
+        const x = el.querySelector('.clear-pick');
+        if (x) x.remove();
+    });
+
+    // Re-render all later round slots
+    for (const slot of Object.keys(PROGRESSION)) {
+        renderGameSlot(slot);
+    }
+
+    showSaveBar();
 }
 
 function showSaveBar() {
@@ -770,6 +813,11 @@ document.querySelectorAll('.game-team.picked:not(.locked)').forEach(function(el)
         el.appendChild(btn);
     }
 });
+
+// Show save bar if there are existing picks (for Clear Bracket access)
+if (Object.keys(picks).length > 0 && (PHASE1_OPEN || PHASE2_OPEN)) {
+    document.getElementById('save-bar').style.display = 'flex';
+}
 
 // Countdown timers
 function updateCountdowns() {

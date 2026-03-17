@@ -528,7 +528,7 @@ button:disabled {
     line-height: 1;
     color: var(--text-dim);
     cursor: pointer;
-    opacity: 0;
+    opacity: 0.4;
     transition: opacity 0.15s;
 }
 
@@ -538,15 +538,6 @@ button:disabled {
 
 .clear-pick:hover {
     color: var(--red);
-}
-
-@media (pointer: coarse) {
-    .game-team.picked .clear-pick {
-        opacity: 0.6;
-    }
-    .game-team.picked .clear-pick:hover {
-        opacity: 1;
-    }
 }
 
 /* Admin */
