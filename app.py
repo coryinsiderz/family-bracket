@@ -423,6 +423,14 @@ def admin():
                 db.session.commit()
                 flash(f"Result deleted for {slot}")
 
+        elif action == "toggle_paid":
+            user_id = int(request.form.get("user_id"))
+            user = User.query.get(user_id)
+            if user:
+                user.paid = not user.paid
+                db.session.commit()
+                flash(f"{'Marked' if user.paid else 'Unmarked'} {user.name} as paid")
+
     teams = {t.id: t for t in Team.query.all()}
     results = {r.game_slot: r for r in GameResult.query.all()}
     users = User.query.all()
@@ -536,6 +544,13 @@ with app.app_context():
         db.session.execute(db.text("ALTER TABLE game_results ADD COLUMN score_team2 INTEGER"))
         db.session.commit()
         logger.info("Added score columns to game_results")
+    except Exception:
+        db.session.rollback()
+    # Migrate: add paid column to users if missing
+    try:
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN paid BOOLEAN NOT NULL DEFAULT FALSE"))
+        db.session.commit()
+        logger.info("Added paid column to users")
     except Exception:
         db.session.rollback()
     if Team.query.count() == 0:

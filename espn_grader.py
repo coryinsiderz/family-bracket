@@ -310,13 +310,15 @@ def poll_and_grade(app):
             r.game_slot: r for r in GameResult.query.all()
         }
 
-        # Check yesterday, today, and next 2 days for upcoming tip times
+        # Check yesterday, today, and next 4 days for upcoming tip times
         today = datetime.utcnow()
         dates = [
             (today - timedelta(days=1)).strftime("%Y%m%d"),
             today.strftime("%Y%m%d"),
             (today + timedelta(days=1)).strftime("%Y%m%d"),
             (today + timedelta(days=2)).strftime("%Y%m%d"),
+            (today + timedelta(days=3)).strftime("%Y%m%d"),
+            (today + timedelta(days=4)).strftime("%Y%m%d"),
         ]
 
         new_results = 0

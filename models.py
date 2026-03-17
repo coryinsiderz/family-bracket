@@ -10,6 +10,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    paid = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
     picks = db.relationship("Pick", backref="user", lazy=True)
 
     def set_password(self, password):

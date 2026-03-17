@@ -135,6 +135,36 @@
         </table>
     </div>
 
+    <!-- Payment Tracking -->
+    <div class="card mt-16">
+        <h2>Payment Tracking</h2>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-center">Paid</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.name }}</td>
+                    <td class="text-center">
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="action" value="toggle_paid">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                            <button type="submit" class="{{ 'btn-sm' if not u.paid else 'btn-sm btn-danger' }}" style="min-width: 60px;">
+                                {{ '&#10003; Paid' if u.paid else 'Unpaid' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
     <!-- All Users' Picks -->
     <div class="card mt-16">
         <h2>All Picks</h2>

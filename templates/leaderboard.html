@@ -14,6 +14,7 @@
                 <tr>
                     <th class="rank">#</th>
                     <th>Name</th>
+                    <th class="text-center">Paid</th>
                     <th class="text-right">Correct</th>
                     <th class="text-right">Round Pts</th>
                     <th class="text-right">Bonus Pts</th>
@@ -25,6 +26,7 @@
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
                     <td class="rank">{{ entry.rank }}</td>
                     <td class="name-col">{{ entry.name }}</td>
+                    <td class="text-center">{{ '&#10003;' if entry.paid else '' }}</td>
                     <td class="text-right">{{ entry.correct_picks }}</td>
                     <td class="text-right">{{ entry.round_points }}</td>
                     <td class="text-right">{{ entry.bonus_points }}</td>
