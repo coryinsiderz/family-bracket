@@ -98,6 +98,11 @@ def calculate_leaderboard():
             "correct_picks": score["correct_picks"],
         })
     board.sort(key=lambda x: x["total"], reverse=True)
+    # Standard competition ranking: ties get the same rank,
+    # next rank skips (e.g. 1, 1, 3, 4, 4, 6)
     for i, entry in enumerate(board):
-        entry["rank"] = i + 1
+        if i > 0 and entry["total"] == board[i - 1]["total"]:
+            entry["rank"] = board[i - 1]["rank"]
+        else:
+            entry["rank"] = i + 1
     return board

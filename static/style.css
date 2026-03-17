@@ -275,14 +275,13 @@ button:disabled {
     display: grid;
     grid-template-columns: 200px 200px 200px 200px;
     gap: 0 24px;
-    align-items: start;
+    align-items: stretch;
 }
 
 .bracket-round {
     display: flex;
     flex-direction: column;
     justify-content: space-around;
-    min-height: 100%;
 }
 
 .bracket-round-header {
