@@ -281,7 +281,13 @@ button:disabled {
 .bracket-round {
     display: flex;
     flex-direction: column;
+}
+
+.bracket-games {
+    display: flex;
+    flex-direction: column;
     justify-content: space-around;
+    flex: 1;
 }
 
 .bracket-round-header {
@@ -502,11 +508,16 @@ button:disabled {
     right: 0;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
-    padding: 12px 24px;
+    padding: 6px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 100;
+}
+
+.save-bar button {
+    padding: 4px 12px;
+    font-size: 12px;
 }
 
 .save-bar .status {

@@ -11,6 +11,8 @@ class User(db.Model):
     name = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     paid = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
+    submitted = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
+    submitted_at = db.Column(db.DateTime(timezone=True), nullable=True)
     picks = db.relationship("Pick", backref="user", lazy=True)
 
     def set_password(self, password):
