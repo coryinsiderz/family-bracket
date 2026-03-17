@@ -505,9 +505,21 @@ document.querySelectorAll('.game-team.picked').forEach(el => {
     }
 });
 
-function clearPick(e, slot) {
+function clearPick(e, slot, teamId) {
     e.stopPropagation();
-    unpickTeam(slot);
+    if (picks[slot] && picks[slot].id === teamId) {
+        // Team is picked in this slot — normal unpick
+        unpickTeam(slot);
+    } else if (PROGRESSION[slot]) {
+        // Team is propagated from a feeder — find and clear the feeder pick
+        const feeders = PROGRESSION[slot];
+        for (const feeder of feeders) {
+            if (picks[feeder] && picks[feeder].id === teamId) {
+                unpickTeam(feeder);
+                return;
+            }
+        }
+    }
 }
 
 function pickTeam(el) {
@@ -539,7 +551,7 @@ function pickTeam(el) {
         const btn = document.createElement('span');
         btn.className = 'clear-pick';
         btn.innerHTML = '&times;';
-        btn.onclick = function(e) { clearPick(e, slot); };
+        btn.onclick = function(e) { clearPick(e, slot, teamId); };
         el.appendChild(btn);
     }
     const team = { id: teamId, name: el.dataset.name, seed: el.dataset.seed };
@@ -556,6 +568,9 @@ function pickTeam(el) {
 
     // Propagate forward
     propagatePick(slot, team);
+
+    // Re-render this slot so non-picked teams also get X buttons (later rounds only)
+    renderGameSlot(slot);
 }
 
 function unpickTeam(slot) {
@@ -705,7 +720,7 @@ function renderGameSlot(slot) {
             const pickedClass = isPicked ? 'picked' : '';
             const correctClass = isCorrect ? 'correct' : '';
             const wrongClass = isWrong ? 'wrong' : '';
-            const clearBtn = !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}')">&times;</span>` : '';
+            const clearBtn = !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}', ${team.id})">&times;</span>` : '';
 
             // Actual winner display for wrong picks
             let actualWinnerHtml = '';
@@ -813,10 +828,11 @@ document.querySelectorAll('.game-team:not(.locked)').forEach(function(el) {
         // Don't add X if this slot has a final result
         const slot = el.dataset.slot;
         if (RESULTS[slot] && RESULTS[slot].winner_id) return;
+        const teamId = parseInt(el.dataset.teamId);
         const btn = document.createElement('span');
         btn.className = 'clear-pick';
         btn.innerHTML = '&times;';
-        btn.onclick = function(e) { clearPick(e, slot); };
+        btn.onclick = function(e) { clearPick(e, slot, teamId); };
         el.appendChild(btn);
     }
 });
