@@ -333,8 +333,10 @@ def save_picks():
     for slot, team_id in picks_data.items():
         slot_phase = get_phase_for_slot(slot)
 
-        # Phase 1: save all picks (R64 through Championship)
+        # Phase 1: only save R64 and R32 picks
         # Phase 2: only save S16+ picks
+        if phase == 1 and slot_phase == 2:
+            continue
         if phase == 2 and slot_phase == 1:
             continue
 

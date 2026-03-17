@@ -9,7 +9,7 @@
             <span class="phase-status {{ 'phase-open' if phase1_open else 'phase-locked' }}">
                 Opening Weekend {{ 'Open' if phase1_open else 'Locked' }}
             </span>
-            <span class="phase-info">R64 through Championship</span>
+            <span class="phase-info">R64 + R32</span>
             {% if phase1_open %}
             <span class="countdown" data-deadline="{{ phase1_lock.isoformat() }}"></span>
             {% endif %}
@@ -192,7 +192,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -240,7 +240,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -296,7 +296,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -343,7 +343,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -390,7 +390,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase1_open and not phase2_open else '' }}"
+                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -441,7 +441,7 @@
         <button class="btn-danger" onclick="clearBracket()">Clear Bracket</button>
         {% endif %}
         {% if phase1_open %}
-        <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
+        <button onclick="savePicks(1)" id="save-phase1-btn">Save R64 + R32</button>
         {% endif %}
         {% if phase2_open %}
         <button onclick="savePicks(2)" id="save-phase2-btn">Save Rest of the Way</button>
@@ -527,12 +527,10 @@ function pickTeam(el) {
     const teamId = parseInt(el.dataset.teamId);
     const phase = parseInt(el.dataset.phase);
 
-    // During Opening Weekend: allow picking all rounds (R64 through Championship)
-    // During Rest of the Way: only allow picking S16+ from alive teams
-    // When both locked: no picks allowed
-    if (!PHASE1_OPEN && !PHASE2_OPEN) return;
+    // Phase 1 (R64+R32): only pickable when PHASE1_OPEN
+    // Phase 2 (S16+): only pickable when PHASE2_OPEN, from alive teams
     if (phase === 1 && !PHASE1_OPEN) return;
-    if (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN) return;
+    if (phase === 2 && !PHASE2_OPEN) return;
     if (phase === 2 && PHASE2_OPEN && ALIVE_TEAM_IDS.size > 0 && !ALIVE_TEAM_IDS.has(teamId)) return;
 
     const oldPick = picks[slot];
@@ -578,9 +576,8 @@ function unpickTeam(slot) {
     const oldPick = picks[slot];
 
     const phase = phaseForSlot(slot);
-    if (!PHASE1_OPEN && !PHASE2_OPEN) return;
     if (phase === 1 && !PHASE1_OPEN) return;
-    if (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN) return;
+    if (phase === 2 && !PHASE2_OPEN) return;
 
     if (oldPick) {
         // Clear this pick
@@ -660,6 +657,10 @@ function cascadeClear(slot, oldTeamId) {
     if (!feed) return;
 
     const parentSlot = feed.parent;
+    // Don't cascade into locked phase 2 slots
+    const parentPhase = phaseForSlot(parentSlot);
+    if (parentPhase === 2 && !PHASE2_OPEN) return;
+
     const parentPick = picks[parentSlot];
 
     if (parentPick && parentPick.id === oldTeamId) {
@@ -679,6 +680,10 @@ function cascadeClear(slot, oldTeamId) {
 function propagatePick(slot, team) {
     const feed = FEEDS_INTO[slot];
     if (!feed) return;
+
+    // Don't propagate into phase 2 slots when only phase 1 is open
+    const parentPhase = phaseForSlot(feed.parent);
+    if (parentPhase === 2 && !PHASE2_OPEN) return;
 
     renderGameSlot(feed.parent);
 }
@@ -707,7 +712,7 @@ function renderGameSlot(slot) {
     });
 
     const currentPick = picks[slot];
-    const isLocked = (phase === 1 && !PHASE1_OPEN) || (phase === 2 && !PHASE1_OPEN && !PHASE2_OPEN);
+    const isLocked = (phase === 1 && !PHASE1_OPEN) || (phase === 2 && !PHASE2_OPEN);
 
     let html = '';
     for (let i = 0; i < 2; i++) {
@@ -779,7 +784,10 @@ function renderGameSlot(slot) {
 
     const feed = FEEDS_INTO[slot];
     if (feed && picks[slot]) {
-        renderGameSlot(feed.parent);
+        const parentPhase = phaseForSlot(feed.parent);
+        if (!(parentPhase === 2 && !PHASE2_OPEN)) {
+            renderGameSlot(feed.parent);
+        }
     }
 }
 
@@ -818,7 +826,7 @@ async function savePicks(phase) {
         document.getElementById('save-status').className = 'status unsaved';
     } finally {
         btn.disabled = false;
-        btn.textContent = phase === 1 ? 'Save Bracket' : 'Save Rest of the Way';
+        btn.textContent = phase === 1 ? 'Save R64 + R32' : 'Save Rest of the Way';
     }
 }
 
