@@ -737,7 +737,10 @@ function renderGameSlot(slot) {
             const pickedClass = isPicked ? 'picked' : '';
             const correctClass = isCorrect ? 'correct' : '';
             const wrongClass = isWrong ? 'wrong' : '';
-            const clearBtn = !isLocked && !result ? `<span class="clear-pick" onclick="clearPick(event, '${slot}', ${team.id})">&times;</span>` : '';
+            // Show X on unlocked slots, and also on locked phase-2 slots
+            // that are just visual propagation during phase 1
+            const showClear = !result && (!isLocked || (phase === 2 && !PHASE2_OPEN && PHASE1_OPEN));
+            const clearBtn = showClear ? `<span class="clear-pick" onclick="clearPick(event, '${slot}', ${team.id})">&times;</span>` : '';
 
             // Actual winner display for wrong picks
             let actualWinnerHtml = '';
