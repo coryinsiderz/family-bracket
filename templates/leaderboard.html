@@ -24,7 +24,7 @@
             <tbody>
                 {% for entry in board %}
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
-                    <td class="rank">{{ loop.index if locked else entry.rank }}</td>
+                    <td class="rank">{{ entry.rank }}</td>
                     <td class="name-col">{{ entry.name }}</td>
                     <td class="text-center">{{ '&#10003;' if entry.paid else '' }}</td>
                     {% if not locked %}
