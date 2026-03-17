@@ -329,31 +329,37 @@ def save_picks():
                     "error": f"{name} has been eliminated"
                 }), 400
 
-    # Save picks
-    for slot, team_id in picks_data.items():
-        slot_phase = get_phase_for_slot(slot)
+    # Determine which slots belong to this phase
+    phase_slots = {
+        slot for slot, team_id in picks_data.items()
+        if get_phase_for_slot(slot) == phase
+    }
 
-        # Phase 1: only save R64 and R32 picks
-        # Phase 2: only save S16+ picks
-        if phase == 1 and slot_phase == 2:
-            continue
-        if phase == 2 and slot_phase == 1:
-            continue
+    # Also include any existing DB picks for this phase (so cleared ones get deleted)
+    existing_picks = Pick.query.filter_by(user_id=user.id).all()
+    for p in existing_picks:
+        if get_phase_for_slot(p.game_slot) == phase:
+            phase_slots.add(p.game_slot)
 
+    # Upsert submitted picks, delete cleared ones
+    for slot in phase_slots:
+        team_id = picks_data.get(slot)
         existing = Pick.query.filter_by(
             user_id=user.id, game_slot=slot
         ).first()
 
-        if existing:
-            existing.picked_team_id = team_id
-        else:
-            pick = Pick(
-                user_id=user.id,
-                game_slot=slot,
-                picked_team_id=team_id,
-                phase=phase,
-            )
-            db.session.add(pick)
+        if team_id:
+            if existing:
+                existing.picked_team_id = team_id
+            else:
+                db.session.add(Pick(
+                    user_id=user.id,
+                    game_slot=slot,
+                    picked_team_id=team_id,
+                    phase=phase,
+                ))
+        elif existing:
+            db.session.delete(existing)
 
     db.session.commit()
     return jsonify({"ok": True})
