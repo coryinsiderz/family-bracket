@@ -677,10 +677,6 @@ function cascadeClear(slot, oldTeamId) {
     if (!feed) return;
 
     const parentSlot = feed.parent;
-    // Don't cascade into locked phase 2 slots
-    const parentPhase = phaseForSlot(parentSlot);
-    if (parentPhase === 2 && !PHASE2_OPEN) return;
-
     const parentPick = picks[parentSlot];
 
     if (parentPick && parentPick.id === oldTeamId) {
@@ -700,10 +696,6 @@ function cascadeClear(slot, oldTeamId) {
 function propagatePick(slot, team) {
     const feed = FEEDS_INTO[slot];
     if (!feed) return;
-
-    // Don't propagate into phase 2 slots when only phase 1 is open
-    const parentPhase = phaseForSlot(feed.parent);
-    if (parentPhase === 2 && !PHASE2_OPEN) return;
 
     renderGameSlot(feed.parent);
 }
@@ -804,10 +796,7 @@ function renderGameSlot(slot) {
 
     const feed = FEEDS_INTO[slot];
     if (feed && picks[slot]) {
-        const parentPhase = phaseForSlot(feed.parent);
-        if (!(parentPhase === 2 && !PHASE2_OPEN)) {
-            renderGameSlot(feed.parent);
-        }
+        renderGameSlot(feed.parent);
     }
 }
 
