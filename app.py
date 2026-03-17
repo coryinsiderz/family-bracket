@@ -552,6 +552,12 @@ with app.app_context():
         logger.info(f"Seeded {len(TEAMS)} teams")
 
 if os.environ.get("ENABLE_ESPN_POLL", "1") == "1":
+    # Run first poll synchronously so data is available immediately
+    try:
+        poll_and_grade(app)
+        logger.info("Initial ESPN poll completed")
+    except Exception as e:
+        logger.error(f"Initial ESPN poll failed: {e}")
     start_scheduler()
 
 

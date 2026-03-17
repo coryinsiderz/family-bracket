@@ -41,6 +41,9 @@ ESPN_NAME_OVERRIDES = {
     "Long Island University": "LIU",
     "Cal Baptist Lancers": "Cal Baptist",
     "California Baptist": "Cal Baptist",
+    "Hawai'i Rainbow Warriors": "Hawaii",
+    "Hawai'i": "Hawaii",
+    "Hawaii Rainbow Warriors": "Hawaii",
     "North Dakota St": "North Dakota State",
     "Tennessee St": "Tennessee State",
     "Utah St": "Utah State",
@@ -297,7 +300,7 @@ def infer_round_number(date_str):
 
 def poll_and_grade(app):
     """Main polling function. Call periodically during tournament."""
-    global LIVE_GAME_DATA
+    logger.info("ESPN poll starting...")
 
     with app.app_context():
         teams = Team.query.all()
@@ -307,11 +310,13 @@ def poll_and_grade(app):
             r.game_slot: r for r in GameResult.query.all()
         }
 
-        # Check today and yesterday
+        # Check yesterday, today, and next 2 days for upcoming tip times
         today = datetime.utcnow()
         dates = [
-            today.strftime("%Y%m%d"),
             (today - timedelta(days=1)).strftime("%Y%m%d"),
+            today.strftime("%Y%m%d"),
+            (today + timedelta(days=1)).strftime("%Y%m%d"),
+            (today + timedelta(days=2)).strftime("%Y%m%d"),
         ]
 
         new_results = 0
@@ -319,6 +324,7 @@ def poll_and_grade(app):
 
         for date_str in dates:
             all_games = fetch_espn_games(date_str)
+            logger.info(f"ESPN: {date_str} returned {len(all_games)} games")
             round_number = infer_round_number(date_str)
 
             for game in all_games:
@@ -366,7 +372,24 @@ def poll_and_grade(app):
                         f"({t1_data['score']}-{t2_data['score']})"
                     )
 
-        LIVE_GAME_DATA = live_data
+        # Also expose FF live data under the R64 slot that contains the FF game
+        for (region, idx), ff_slot in FIRST_FOUR_SLOTS.items():
+            if ff_slot in live_data:
+                r64_slot = f"{region}_r64_{idx + 1}"
+                if r64_slot not in live_data:
+                    live_data[r64_slot] = live_data[ff_slot]
+
+        LIVE_GAME_DATA.clear()
+        LIVE_GAME_DATA.update(live_data)
+
+        scheduled = sum(1 for v in live_data.values() if v["status"] == "scheduled")
+        in_progress = sum(1 for v in live_data.values() if v["status"] == "in_progress")
+        completed = sum(1 for v in live_data.values() if v["status"] == "completed")
+        logger.info(
+            f"ESPN poll done: {len(live_data)} matched slots "
+            f"(scheduled={scheduled}, live={in_progress}, final={completed}), "
+            f"{new_results} new results"
+        )
 
         if new_results > 0:
             db.session.commit()
