@@ -424,13 +424,6 @@ def poll_and_grade(app):
                         f"({t1_data['score']}-{t2_data['score']})"
                     )
 
-        # Also expose FF live data under the R64 slot that contains the FF game
-        for (region, idx), ff_slot in FIRST_FOUR_SLOTS.items():
-            if ff_slot in live_data:
-                r64_slot = f"{region}_r64_{idx + 1}"
-                if r64_slot not in live_data:
-                    live_data[r64_slot] = live_data[ff_slot]
-
         LIVE_GAME_DATA.clear()
         LIVE_GAME_DATA.update(live_data)
 
