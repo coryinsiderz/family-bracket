@@ -11,7 +11,8 @@
             <thead>
                 <tr>
                     <th class="rank">#</th>
-                    <th class="paid-col"></th>
+                    <th class="paid-col" title="Paid">$</th>
+                    <th class="submitted-col" title="Submitted">✎</th>
                     <th>Name</th>
                     {% if not locked %}
                     <th class="text-right">Correct</th>
@@ -26,6 +27,7 @@
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
                     <td class="rank">{{ entry.rank }}</td>
                     <td class="paid-col">{{ '✓' if entry.paid else '' }}</td>
+                    <td class="submitted-col">{{ '✓' if entry.submitted else '' }}</td>
                     <td class="name-col">{{ entry.name }}</td>
                     {% if not locked %}
                     <td class="text-right">{{ entry.correct_picks }}</td>

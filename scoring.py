@@ -92,6 +92,7 @@ def calculate_leaderboard():
             "user_id": user.id,
             "name": user.name,
             "paid": user.paid,
+            "submitted": user.submitted,
             "total": score["total"],
             "round_points": score["round_points"],
             "bonus_points": score["bonus_points"],
