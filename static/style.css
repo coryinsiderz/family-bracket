@@ -587,6 +587,18 @@ button:disabled {
 .paste-r32-winner { font-weight: 700; color: var(--green); }
 .paste-line-error { color: var(--red); }
 .paste-line-fuzzy { color: var(--yellow); }
+.paste-dropdown {
+    background: #1a1a2e;
+    color: var(--yellow);
+    border: 1px solid var(--yellow);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    max-width: 200px;
+}
+.paste-dropdown:focus { outline: 1px solid var(--accent); }
 
 /* Clear pick button */
 

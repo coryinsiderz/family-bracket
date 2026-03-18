@@ -1294,9 +1294,20 @@ function parsePasteAndPreview() {
     }
 
     lastParseResult = result;
-    let hasErrors = result.errors.length > 0;
-    let html = '';
+    renderPastePreview();
+}
 
+function renderPastePreview() {
+    const result = lastParseResult;
+    if (!result) return;
+
+    // Count unresolved errors (picks that still have no team)
+    let unresolvedCount = 0;
+    for (const pick of result.r64Picks) {
+        if (!pick.team) unresolvedCount++;
+    }
+
+    let html = '';
     const regionNames = { east: 'East', west: 'West', midwest: 'Midwest', south: 'South' };
 
     for (let ri = 0; ri < 4; ri++) {
@@ -1304,44 +1315,117 @@ function parsePasteAndPreview() {
         html += `<div class="paste-region-header">${regionNames[region]}</div>`;
 
         for (let p = 0; p < 4; p++) {
-            const r32 = result.r32Picks[ri * 4 + p];
+            const r32Idx = ri * 4 + p;
+            const r32 = result.r32Picks[r32Idx];
             const p1 = r32.pick1;
             const p2 = r32.pick2;
 
-            const t1Class = p1.error ? 'paste-line-error' : (p1.confidence === 'fuzzy' ? 'paste-line-fuzzy' : '');
-            const t2Class = p2.error ? 'paste-line-error' : (p2.confidence === 'fuzzy' ? 'paste-line-fuzzy' : '');
-
-            const t1Name = p1.team ? p1.team.name : `??? (${p1.raw})`;
-            const t2Name = p2.team ? p2.team.name : `??? (${p2.raw})`;
-
-            const t1Seed = p1.team ? `(${p1.team.seed})` : '';
-            const t2Seed = p2.team ? `(${p2.team.seed})` : '';
+            // Build team display or dropdown for each pick
+            const t1Html = buildPickHtml(p1);
+            const t2Html = buildPickHtml(p2);
 
             const winnerName = r32.winner ? r32.winner.name : '???';
-            const winnerClass = r32.warning && !r32.winner ? 'paste-line-error' : 'paste-r32-winner';
+            const winnerClass = !r32.winner ? 'paste-line-error' : 'paste-r32-winner';
 
-            let errorNotes = '';
-            if (p1.error) errorNotes += `<span class="paste-line-error" style="font-size: 10px;">${p1.error}</span><br>`;
-            if (p2.error) errorNotes += `<span class="paste-line-error" style="font-size: 10px;">${p2.error}</span><br>`;
-            if (r32.warning) errorNotes += `<span class="paste-line-fuzzy" style="font-size: 10px;">${r32.warning}</span>`;
+            let notes = '';
+            if (r32.warning) notes += `<span class="paste-line-fuzzy" style="font-size: 10px;">${r32.warning}</span>`;
 
-            html += `<div class="paste-matchup">
-                R32 #${p+1}: <span class="${t1Class}">${t1Seed} ${t1Name}</span>
-                vs <span class="${t2Class}">${t2Seed} ${t2Name}</span>
-                &rarr; <span class="${winnerClass}">${winnerName}</span>
-                ${errorNotes ? '<br>' + errorNotes : ''}
+            html += `<div class="paste-matchup" id="paste-matchup-${r32Idx}">
+                R32 #${p+1}: ${t1Html}
+                vs ${t2Html}
+                &rarr; <span class="${winnerClass}" id="paste-r32-winner-${r32Idx}">${winnerName}</span>
+                ${notes ? '<br>' + notes : ''}
             </div>`;
         }
     }
 
     document.getElementById('paste-preview-content').innerHTML = html;
-    document.getElementById('paste-error-summary').textContent = hasErrors
-        ? `${result.errors.length} error(s) found. Fix the text and re-preview, or apply anyway (errors will be skipped).`
+    document.getElementById('paste-error-summary').textContent = unresolvedCount > 0
+        ? `${unresolvedCount} team(s) couldn't be matched. Use the dropdowns to select the correct team.`
         : 'All teams matched successfully.';
+    document.getElementById('paste-error-summary').style.color = unresolvedCount > 0 ? 'var(--yellow)' : 'var(--green)';
     document.getElementById('paste-apply-btn').disabled = false;
     document.getElementById('paste-input-area').style.display = 'none';
     document.getElementById('paste-preview-area').style.display = 'block';
     document.getElementById('paste-modal-title').textContent = 'Preview';
+}
+
+function buildPickHtml(pick) {
+    if (pick.team) {
+        const cls = pick.confidence === 'fuzzy' ? 'paste-line-fuzzy' : '';
+        return `<span class="${cls}">(${pick.team.seed}) ${pick.team.name}</span>`;
+    }
+    // No match — show dropdown with valid teams from this slot
+    const validTeams = getR64TeamsForSlot(pick.slot);
+    const pickIdx = pick.lineNum - 1; // 0-indexed into r64Picks
+    let opts = `<option value="">??? "${pick.raw}" — pick team:</option>`;
+    for (const t of validTeams) {
+        opts += `<option value="${t.id}">(${t.seed}) ${t.name}</option>`;
+    }
+    return `<select class="paste-dropdown" onchange="onPasteDropdownChange(${pickIdx}, this.value)">${opts}</select>`;
+}
+
+function onPasteDropdownChange(r64Idx, teamIdStr) {
+    if (!lastParseResult) return;
+    const pick = lastParseResult.r64Picks[r64Idx];
+    if (!teamIdStr) {
+        // Reset to unmatched
+        pick.team = null;
+        pick.error = `Could not match "${pick.raw}"`;
+    } else {
+        const teamId = parseInt(teamIdStr);
+        const validTeams = getR64TeamsForSlot(pick.slot);
+        const team = validTeams.find(t => t.id === teamId);
+        if (team) {
+            pick.team = team;
+            pick.confidence = 'manual';
+            pick.error = null;
+        }
+    }
+    // Recalculate the R32 winner for this pair
+    recalcR32ForPick(r64Idx);
+    // Re-render the full preview
+    renderPastePreview();
+}
+
+function recalcR32ForPick(r64Idx) {
+    const result = lastParseResult;
+    const regionIdx = Math.floor(r64Idx / 8);
+    const gameInRegion = r64Idx % 8;
+    const pairIdx = Math.floor(gameInRegion / 2);
+    const r32Idx = regionIdx * 4 + pairIdx;
+    const region = PASTE_REGION_ORDER[regionIdx];
+
+    const base = regionIdx * 8;
+    const idx1 = base + pairIdx * 2;
+    const idx2 = base + pairIdx * 2 + 1;
+    const pick1 = result.r64Picks[idx1];
+    const pick2 = result.r64Picks[idx2];
+
+    let winner = null;
+    let warning = null;
+
+    if (pick1.isUpper && !pick2.isUpper && pick1.team) {
+        winner = pick1.team;
+    } else if (pick2.isUpper && !pick1.isUpper && pick2.team) {
+        winner = pick2.team;
+    } else if (pick1.isUpper && pick2.isUpper) {
+        warning = 'Both lines are CAPS — using first as R32 winner';
+        if (pick1.team) winner = pick1.team;
+    } else {
+        warning = 'No CAPS line found — no R32 pick';
+    }
+
+    result.r32Picks[r32Idx].winner = winner;
+    result.r32Picks[r32Idx].warning = warning;
+    result.r32Picks[r32Idx].pick1 = pick1;
+    result.r32Picks[r32Idx].pick2 = pick2;
+
+    // Recalculate errors array
+    result.errors = [];
+    for (const p of result.r64Picks) {
+        if (p.error) result.errors.push(`Line ${p.lineNum}: ${p.error}`);
+    }
 }
 
 function applyPastedPicks() {
