@@ -568,6 +568,26 @@ button:disabled {
     min-width: 100px;
 }
 
+/* Paste bracket preview */
+.paste-region-header {
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.paste-matchup {
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.6;
+}
+.paste-r32-winner { font-weight: 700; color: var(--green); }
+.paste-line-error { color: var(--red); }
+.paste-line-fuzzy { color: var(--yellow); }
+
 /* Clear pick button */
 
 .clear-pick {

@@ -461,6 +461,34 @@
     </div>
 </div>
 
+<!-- Paste bracket modal -->
+<div class="confirm-clear-overlay" id="paste-modal" style="display: none;">
+    <div class="confirm-clear-box" style="max-width: 640px; width: 92%; max-height: 85vh; overflow-y: auto; align-items: stretch;">
+        <span style="font-size: 16px; font-weight: 600;" id="paste-modal-title">Paste Bracket</span>
+        <div id="paste-input-area">
+            <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.6;">
+                Paste 32 lines: 8 per region (East, West, Midwest, South).<br>
+                Order per region: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15 winners.<br>
+                CAPITALIZE the team that wins the Round of 32 in each pair.
+            </div>
+            <textarea id="paste-textarea" rows="18" style="width: 100%; font-family: var(--font); font-size: 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px; resize: vertical;"></textarea>
+            <div class="flex gap-8" style="margin-top: 8px;">
+                <button onclick="parsePasteAndPreview()">Preview</button>
+                <button onclick="closePasteModal()">Cancel</button>
+            </div>
+        </div>
+        <div id="paste-preview-area" style="display: none;">
+            <div id="paste-preview-content" style="font-size: 12px;"></div>
+            <div id="paste-error-summary" style="color: var(--red); font-size: 12px; margin-top: 8px;"></div>
+            <div class="flex gap-8" style="margin-top: 12px;">
+                <button onclick="applyPastedPicks()" id="paste-apply-btn" style="background: #0a4a0a; border-color: var(--green); color: var(--green);">Apply Picks</button>
+                <button onclick="showPasteInput()">Back</button>
+                <button onclick="closePasteModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Save bar -->
 <div class="save-bar" id="save-bar" style="display: none;">
     <span class="status" id="save-status">
@@ -472,6 +500,7 @@
         {% if phase1_open or phase2_open %}
         <button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>
         {% if phase1_open %}
+        <button onclick="showPasteModal()">Paste Bracket</button>
         <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
         {% endif %}
         {% if phase2_open %}
@@ -966,5 +995,405 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 document.getElementById('bracket-wrapper').oncontextmenu = function(e) { e.preventDefault(); return false; };
+
+// ============== PASTE BRACKET FEATURE ==============
+
+const TEAM_ALIASES = {
+    // EAST
+    "duke": "Duke", "blue devils": "Duke", "dook": "Duke",
+    "siena": "Siena", "saints": "Siena",
+    "ohio state": "Ohio State", "osu": "Ohio State", "buckeyes": "Ohio State", "ohio st": "Ohio State",
+    "tcu": "TCU", "horned frogs": "TCU",
+    "st. john's": "St. John's", "st johns": "St. John's", "saint john's": "St. John's", "st john's": "St. John's", "johnnies": "St. John's", "saint johns": "St. John's",
+    "northern iowa": "Northern Iowa", "uni": "Northern Iowa", "ni": "Northern Iowa",
+    "kansas": "Kansas", "ku": "Kansas", "jayhawks": "Kansas",
+    "cal baptist": "Cal Baptist", "cbu": "Cal Baptist", "california baptist": "Cal Baptist", "cal bap": "Cal Baptist",
+    "louisville": "Louisville", "lou": "Louisville", "cards": "Louisville",
+    "south florida": "South Florida", "usf": "South Florida", "bulls": "South Florida", "s florida": "South Florida",
+    "michigan state": "Michigan State", "msu": "Michigan State", "spartans": "Michigan State", "sparty": "Michigan State", "mich st": "Michigan State", "mich state": "Michigan State",
+    "north dakota state": "North Dakota State", "ndsu": "North Dakota State", "bison": "North Dakota State", "nd state": "North Dakota State",
+    "ucla": "UCLA", "bruins": "UCLA",
+    "ucf": "UCF", "knights": "UCF",
+    "uconn": "UConn", "conn": "UConn", "connecticut": "UConn", "huskies": "UConn",
+    "furman": "Furman", "paladins": "Furman",
+    // WEST
+    "arizona": "Arizona", "zona": "Arizona", "wildcats": "Arizona",
+    "liu": "LIU", "long island": "LIU", "long island university": "LIU",
+    "villanova": "Villanova", "nova": "Villanova",
+    "utah state": "Utah State", "utah st": "Utah State", "usu": "Utah State",
+    "wisconsin": "Wisconsin", "wiscy": "Wisconsin", "badgers": "Wisconsin",
+    "high point": "High Point",
+    "arkansas": "Arkansas", "razorbacks": "Arkansas", "hogs": "Arkansas", "arky": "Arkansas",
+    "hawaii": "Hawaii", "hawai'i": "Hawaii",
+    "byu": "BYU", "brigham young": "BYU",
+    "texas": "Texas", "longhorns": "Texas", "tejas": "Texas",
+    "nc state": "NC State", "north carolina state": "NC State", "wolfpack": "NC State", "n.c. state": "NC State", "ncst": "NC State",
+    "gonzaga": "Gonzaga", "zags": "Gonzaga", "zaga": "Gonzaga",
+    "kennesaw state": "Kennesaw State", "kennesaw": "Kennesaw State", "kennesaw st": "Kennesaw State",
+    "miami (fl)": "Miami (FL)", "miami fl": "Miami (FL)", "miami florida": "Miami (FL)", "hurricanes": "Miami (FL)", "the u": "Miami (FL)",
+    "missouri": "Missouri", "mizzou": "Missouri",
+    "purdue": "Purdue", "boilermakers": "Purdue",
+    "queens": "Queens",
+    // MIDWEST
+    "michigan": "Michigan", "wolverines": "Michigan",
+    "umbc": "UMBC", "retrievers": "UMBC",
+    "howard": "Howard",
+    "georgia": "Georgia", "dawgs": "Georgia", "uga": "Georgia", "bulldogs": "Georgia",
+    "saint louis": "Saint Louis", "slu": "Saint Louis", "st louis": "Saint Louis", "st. louis": "Saint Louis", "billikens": "Saint Louis",
+    "texas tech": "Texas Tech", "red raiders": "Texas Tech", "ttu": "Texas Tech", "tex tech": "Texas Tech",
+    "akron": "Akron", "zips": "Akron",
+    "alabama": "Alabama", "bama": "Alabama", "crimson tide": "Alabama", "roll tide": "Alabama",
+    "hofstra": "Hofstra", "pride": "Hofstra",
+    "tennessee": "Tennessee", "vols": "Tennessee", "volunteers": "Tennessee",
+    "smu": "SMU", "mustangs": "SMU", "southern methodist": "SMU",
+    "miami (oh)": "Miami (OH)", "miami oh": "Miami (OH)", "miami ohio": "Miami (OH)", "redhawks": "Miami (OH)",
+    "virginia": "Virginia", "uva": "Virginia", "cavaliers": "Virginia", "wahoos": "Virginia",
+    "wright state": "Wright State", "wright st": "Wright State", "raiders": "Wright State",
+    "kentucky": "Kentucky", "uk": "Kentucky",
+    "santa clara": "Santa Clara", "broncos": "Santa Clara",
+    "iowa state": "Iowa State", "cyclones": "Iowa State", "isu": "Iowa State", "iowa st": "Iowa State",
+    "tennessee state": "Tennessee State", "tennessee st": "Tennessee State", "tsu": "Tennessee State", "tn state": "Tennessee State",
+    // SOUTH
+    "florida": "Florida", "gators": "Florida", "uf": "Florida",
+    "prairie view a&m": "Prairie View A&M", "prairie view": "Prairie View A&M", "pvamu": "Prairie View A&M",
+    "lehigh": "Lehigh", "mountain hawks": "Lehigh",
+    "clemson": "Clemson", "tigers": "Clemson",
+    "iowa": "Iowa", "hawkeyes": "Iowa",
+    "vanderbilt": "Vanderbilt", "vandy": "Vanderbilt", "commodores": "Vanderbilt",
+    "mcneese": "McNeese", "mcneese state": "McNeese", "mcneese st": "McNeese", "cowboys": "McNeese",
+    "nebraska": "Nebraska", "cornhuskers": "Nebraska", "huskers": "Nebraska",
+    "troy": "Troy", "trojans": "Troy",
+    "north carolina": "North Carolina", "unc": "North Carolina", "tar heels": "North Carolina", "carolina": "North Carolina",
+    "vcu": "VCU", "virginia commonwealth": "VCU", "rams": "VCU",
+    "illinois": "Illinois", "illini": "Illinois",
+    "penn": "Penn", "quakers": "Penn",
+    "saint mary's": "Saint Mary's", "st mary's": "Saint Mary's", "st. mary's": "Saint Mary's", "saint marys": "Saint Mary's", "gaels": "Saint Mary's", "st marys": "Saint Mary's",
+    "texas a&m": "Texas A&M", "aggies": "Texas A&M", "tamu": "Texas A&M", "texas am": "Texas A&M",
+    "houston": "Houston", "coogs": "Houston", "hou": "Houston", "cougars": "Houston",
+    "idaho": "Idaho", "vandals": "Idaho",
+};
+
+// Build lookup: lowercase alias -> team object {id, name, seed, region}
+const ALIAS_LOOKUP = {};
+// First, add all canonical names from TEAMS_DATA
+for (const [tid, t] of Object.entries(TEAMS_DATA)) {
+    ALIAS_LOOKUP[t.name.toLowerCase()] = t;
+}
+// Then add aliases
+for (const [alias, canonical] of Object.entries(TEAM_ALIASES)) {
+    const team = ALIAS_LOOKUP[canonical.toLowerCase()];
+    if (team) ALIAS_LOOKUP[alias] = team;
+}
+
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({length: m + 1}, () => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = Math.min(
+                dp[i-1][j] + 1,
+                dp[i][j-1] + 1,
+                dp[i-1][j-1] + (a[i-1] !== b[j-1] ? 1 : 0)
+            );
+        }
+    }
+    return dp[m][n];
+}
+
+function resolveTeamName(input) {
+    // Strip seed numbers like "1 Duke" or "(1) Duke"
+    let cleaned = input.trim().replace(/^\(?\d+\)?\s*/, '').replace(/\s+/g, ' ');
+    const key = cleaned.toLowerCase();
+    if (!key) return { team: null, confidence: 'none', input: input };
+
+    // 1. Exact alias match
+    if (ALIAS_LOOKUP[key]) {
+        return { team: ALIAS_LOOKUP[key], confidence: 'exact', input: input };
+    }
+
+    // 2. Substring match (canonical name contains input or input contains canonical)
+    const allTeams = Object.values(TEAMS_DATA);
+    for (const t of allTeams) {
+        const tLower = t.name.toLowerCase();
+        if (tLower.includes(key) || key.includes(tLower)) {
+            return { team: t, confidence: 'exact', input: input };
+        }
+    }
+
+    // 3. Fuzzy match via Levenshtein
+    let bestTeam = null, bestDist = Infinity;
+    const allKeys = Object.keys(ALIAS_LOOKUP);
+    for (const k of allKeys) {
+        const dist = levenshtein(key, k);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestTeam = ALIAS_LOOKUP[k];
+        }
+    }
+    const maxDist = key.length >= 5 ? 2 : 1;
+    if (bestDist <= maxDist && bestTeam) {
+        return { team: bestTeam, confidence: 'fuzzy', input: input };
+    }
+
+    return { team: null, confidence: 'none', input: input };
+}
+
+function getR64TeamsForSlot(slot) {
+    const gameEl = document.getElementById('game-' + slot);
+    if (!gameEl) return [];
+    const teams = [];
+    gameEl.querySelectorAll('.game-team').forEach(el => {
+        if (el.dataset.teamId) {
+            teams.push({
+                id: parseInt(el.dataset.teamId),
+                name: el.dataset.name || '',
+                seed: el.dataset.seed || ''
+            });
+        }
+    });
+    return teams;
+}
+
+const PASTE_REGION_ORDER = ['east', 'west', 'midwest', 'south'];
+let lastParseResult = null;
+
+function parsePastedBracket(text) {
+    const rawLines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const lines = [];
+    for (const line of rawLines) {
+        const trimmed = line.trim();
+        if (trimmed) lines.push(trimmed);
+    }
+
+    if (lines.length !== 32) {
+        return { error: `Expected 32 lines, got ${lines.length}. Need 8 per region (East, West, Midwest, South).` };
+    }
+
+    const r64Picks = [];
+    const r32Picks = [];
+    const errors = [];
+
+    for (let i = 0; i < 32; i++) {
+        const raw = lines[i];
+        const regionIdx = Math.floor(i / 8);
+        const gameIdx = (i % 8);
+        const region = PASTE_REGION_ORDER[regionIdx];
+        const slot = `${region}_r64_${gameIdx + 1}`;
+
+        // Detect CAPS: line is all uppercase and has at least one letter
+        const hasLetters = /[a-zA-Z]/.test(raw);
+        const isUpper = hasLetters && raw === raw.toUpperCase();
+
+        // Resolve team name
+        const resolved = resolveTeamName(raw);
+        let error = null;
+
+        if (!resolved.team) {
+            error = `Could not match "${raw}"`;
+            errors.push(`Line ${i+1}: ${error}`);
+        } else {
+            // Validate team belongs to this R64 slot
+            const validTeams = getR64TeamsForSlot(slot);
+            const isValid = validTeams.some(t => t.id === resolved.team.id);
+            // Also check by name (for FF combined labels where IDs may differ)
+            const nameMatch = validTeams.some(t => {
+                // Check if the combined label (e.g. "UMBC/Howard") contains the resolved team name
+                return t.name.includes(resolved.team.name) || resolved.team.name.includes(t.name);
+            });
+            if (!isValid && !nameMatch) {
+                error = `"${resolved.team.name}" is not in ${slot.replace(/_/g, ' ')}`;
+                errors.push(`Line ${i+1}: ${error}`);
+            }
+        }
+
+        r64Picks.push({
+            lineNum: i + 1,
+            slot: slot,
+            region: region,
+            raw: raw,
+            team: resolved.team,
+            confidence: resolved.confidence,
+            isUpper: isUpper,
+            error: error
+        });
+    }
+
+    // Derive R32 picks from pairs
+    for (let regionIdx = 0; regionIdx < 4; regionIdx++) {
+        const region = PASTE_REGION_ORDER[regionIdx];
+        const base = regionIdx * 8;
+
+        for (let pair = 0; pair < 4; pair++) {
+            const idx1 = base + pair * 2;
+            const idx2 = base + pair * 2 + 1;
+            const pick1 = r64Picks[idx1];
+            const pick2 = r64Picks[idx2];
+            const r32Slot = `${region}_r32_${pair + 1}`;
+
+            let winner = null;
+            let warning = null;
+
+            if (pick1.isUpper && !pick2.isUpper && pick1.team) {
+                winner = pick1.team;
+            } else if (pick2.isUpper && !pick1.isUpper && pick2.team) {
+                winner = pick2.team;
+            } else if (pick1.isUpper && pick2.isUpper) {
+                warning = 'Both lines are CAPS - using first as R32 winner';
+                if (pick1.team) winner = pick1.team;
+            } else {
+                warning = 'No CAPS line found - no R32 pick';
+            }
+
+            r32Picks.push({
+                slot: r32Slot,
+                region: region,
+                winner: winner,
+                pick1: pick1,
+                pick2: pick2,
+                warning: warning
+            });
+        }
+    }
+
+    return { r64Picks, r32Picks, errors };
+}
+
+function showPasteModal() {
+    document.getElementById('paste-modal').style.display = 'flex';
+    document.getElementById('paste-input-area').style.display = 'block';
+    document.getElementById('paste-preview-area').style.display = 'none';
+    document.getElementById('paste-textarea').value = '';
+    document.getElementById('paste-modal-title').textContent = 'Paste Bracket';
+    lastParseResult = null;
+}
+
+function closePasteModal() {
+    document.getElementById('paste-modal').style.display = 'none';
+}
+
+function showPasteInput() {
+    document.getElementById('paste-input-area').style.display = 'block';
+    document.getElementById('paste-preview-area').style.display = 'none';
+    document.getElementById('paste-modal-title').textContent = 'Paste Bracket';
+}
+
+function parsePasteAndPreview() {
+    const text = document.getElementById('paste-textarea').value;
+    const result = parsePastedBracket(text);
+
+    if (result.error) {
+        document.getElementById('paste-error-summary').textContent = result.error;
+        document.getElementById('paste-preview-area').style.display = 'block';
+        document.getElementById('paste-preview-content').innerHTML = '';
+        document.getElementById('paste-input-area').style.display = 'none';
+        document.getElementById('paste-modal-title').textContent = 'Preview';
+        document.getElementById('paste-apply-btn').disabled = true;
+        return;
+    }
+
+    lastParseResult = result;
+    let hasErrors = result.errors.length > 0;
+    let html = '';
+
+    const regionNames = { east: 'East', west: 'West', midwest: 'Midwest', south: 'South' };
+
+    for (let ri = 0; ri < 4; ri++) {
+        const region = PASTE_REGION_ORDER[ri];
+        html += `<div class="paste-region-header">${regionNames[region]}</div>`;
+
+        for (let p = 0; p < 4; p++) {
+            const r32 = result.r32Picks[ri * 4 + p];
+            const p1 = r32.pick1;
+            const p2 = r32.pick2;
+
+            const t1Class = p1.error ? 'paste-line-error' : (p1.confidence === 'fuzzy' ? 'paste-line-fuzzy' : '');
+            const t2Class = p2.error ? 'paste-line-error' : (p2.confidence === 'fuzzy' ? 'paste-line-fuzzy' : '');
+
+            const t1Name = p1.team ? p1.team.name : `??? (${p1.raw})`;
+            const t2Name = p2.team ? p2.team.name : `??? (${p2.raw})`;
+
+            const t1Seed = p1.team ? `(${p1.team.seed})` : '';
+            const t2Seed = p2.team ? `(${p2.team.seed})` : '';
+
+            const winnerName = r32.winner ? r32.winner.name : '???';
+            const winnerClass = r32.warning && !r32.winner ? 'paste-line-error' : 'paste-r32-winner';
+
+            let errorNotes = '';
+            if (p1.error) errorNotes += `<span class="paste-line-error" style="font-size: 10px;">${p1.error}</span><br>`;
+            if (p2.error) errorNotes += `<span class="paste-line-error" style="font-size: 10px;">${p2.error}</span><br>`;
+            if (r32.warning) errorNotes += `<span class="paste-line-fuzzy" style="font-size: 10px;">${r32.warning}</span>`;
+
+            html += `<div class="paste-matchup">
+                R32 #${p+1}: <span class="${t1Class}">${t1Seed} ${t1Name}</span>
+                vs <span class="${t2Class}">${t2Seed} ${t2Name}</span>
+                &rarr; <span class="${winnerClass}">${winnerName}</span>
+                ${errorNotes ? '<br>' + errorNotes : ''}
+            </div>`;
+        }
+    }
+
+    document.getElementById('paste-preview-content').innerHTML = html;
+    document.getElementById('paste-error-summary').textContent = hasErrors
+        ? `${result.errors.length} error(s) found. Fix the text and re-preview, or apply anyway (errors will be skipped).`
+        : 'All teams matched successfully.';
+    document.getElementById('paste-apply-btn').disabled = false;
+    document.getElementById('paste-input-area').style.display = 'none';
+    document.getElementById('paste-preview-area').style.display = 'block';
+    document.getElementById('paste-modal-title').textContent = 'Preview';
+}
+
+function applyPastedPicks() {
+    if (!lastParseResult) return;
+    const { r64Picks, r32Picks } = lastParseResult;
+
+    // Clear existing bracket
+    clearBracket();
+
+    // Apply R64 picks
+    for (const pick of r64Picks) {
+        if (!pick.team || pick.error) continue;
+
+        // If this slot has a First Four feeder, pick the FF team first
+        const gameEl = document.getElementById('game-' + pick.slot);
+        if (gameEl) {
+            const ffEl = gameEl.querySelector('[data-ff-slot]');
+            if (ffEl) {
+                // The combined FF label - check if the picked team is one of the FF teams
+                const ffSlotName = ffEl.dataset.ffSlot;
+                // Find if the team matches a FF team and pick it
+                const ffTeamEl = gameEl.querySelector(`[data-team-id="${pick.team.id}"]`);
+                if (ffTeamEl) {
+                    pickTeam(ffTeamEl);
+                }
+            } else {
+                // Normal R64 game - find and click the team
+                const teamEl = gameEl.querySelector(`[data-team-id="${pick.team.id}"]`);
+                if (teamEl) {
+                    pickTeam(teamEl);
+                }
+            }
+        }
+    }
+
+    // Apply R32 picks (after all R64 picks so R32 slots are rendered)
+    for (const r32 of r32Picks) {
+        if (!r32.winner) continue;
+        const r32GameEl = document.getElementById('game-' + r32.slot);
+        if (r32GameEl) {
+            const teamEl = r32GameEl.querySelector(`[data-team-id="${r32.winner.id}"]`);
+            if (teamEl) {
+                pickTeam(teamEl);
+            }
+        }
+    }
+
+    closePasteModal();
+    showSaveBar();
+
+    // Auto-save with skipModal=true
+    savePicks(1, true);
+}
 </script>
 {% endblock %}
