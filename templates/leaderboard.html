@@ -11,8 +11,8 @@
             <thead>
                 <tr>
                     <th class="rank">#</th>
+                    <th class="paid-col"></th>
                     <th>Name</th>
-                    <th class="text-center">Paid</th>
                     {% if not locked %}
                     <th class="text-right">Correct</th>
                     <th class="text-right">Round Pts</th>
@@ -25,8 +25,8 @@
                 {% for entry in board %}
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
                     <td class="rank">{{ entry.rank }}</td>
+                    <td class="paid-col">{{ '✓' if entry.paid else '' }}</td>
                     <td class="name-col">{{ entry.name }}</td>
-                    <td class="text-center">{{ '&#10003;' if entry.paid else '' }}</td>
                     {% if not locked %}
                     <td class="text-right">{{ entry.correct_picks }}</td>
                     <td class="text-right">{{ entry.round_points }}</td>

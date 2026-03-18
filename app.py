@@ -374,41 +374,30 @@ def save_picks():
         f"submitted={len(picks_data)}, saved={phase_pick_count}, "
         f"deleted={deleted_count}, total_in_db={saved_count}"
     )
-    return jsonify({"ok": True})
 
+    # Check if phase 1 bracket is complete (all 48 R64+R32 slots filled)
+    bracket_complete = False
+    if phase == 1:
+        phase1_picks = Pick.query.filter_by(user_id=user.id).filter(
+            Pick.phase == 1
+        ).count()
+        # 32 R64 + 16 R32 = 48 slots
+        total_phase1_slots = 48
+        remaining = total_phase1_slots - phase1_picks
+        bracket_complete = remaining == 0
 
-@app.route("/bracket/submit", methods=["POST"])
-@login_required
-def submit_bracket():
-    user = get_current_user()
+        if bracket_complete:
+            user.submitted = True
+            user.submitted_at = now_et()
+            db.session.commit()
+            app.logger.info(f"[AUTO-SUBMIT] user={user.name} bracket complete")
 
-    # Verify the relevant phase is still open
-    if not phase1_open() and not phase2_open():
-        return jsonify({"error": "Bracket is locked"}), 400
+        return jsonify({
+            "ok": True,
+            "bracket_complete": bracket_complete,
+            "remaining": remaining,
+        })
 
-    # Check user has at least some picks
-    pick_count = Pick.query.filter_by(user_id=user.id).count()
-    if pick_count == 0:
-        return jsonify({"error": "No picks to submit"}), 400
-
-    user.submitted = True
-    user.submitted_at = now_et()
-    db.session.commit()
-    app.logger.info(f"[SUBMIT] user={user.name} (id={user.id}), picks={pick_count}")
-    return jsonify({"ok": True})
-
-
-@app.route("/bracket/unsubmit", methods=["POST"])
-@login_required
-def unsubmit_bracket():
-    user = get_current_user()
-
-    if not phase1_open() and not phase2_open():
-        return jsonify({"error": "Bracket is locked"}), 400
-
-    user.submitted = False
-    db.session.commit()
-    app.logger.info(f"[UNSUBMIT] user={user.name} (id={user.id})")
     return jsonify({"ok": True})
 
 

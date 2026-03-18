@@ -484,6 +484,14 @@ button:disabled {
     width: 40px;
 }
 
+.leaderboard-table .paid-col {
+    width: 24px;
+    text-align: center;
+    color: var(--green);
+    padding-left: 4px;
+    padding-right: 0;
+}
+
 .leaderboard-table .name-col {
     font-weight: 600;
     color: var(--text-bright);

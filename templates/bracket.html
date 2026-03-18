@@ -452,14 +452,12 @@
     </div>
 </div>
 
-<div class="confirm-clear-overlay" id="confirm-submit" style="display: none;">
+<!-- Save result modal -->
+<div class="confirm-clear-overlay" id="save-modal" style="display: none;">
     <div class="confirm-clear-box">
-        <span>Submit your bracket?</span>
-        <div style="font-size: 12px; color: var(--text-dim);">You can still edit and re-submit until lock time.</div>
-        <div class="flex gap-8">
-            <button style="background: #0a4a0a; border-color: var(--green); color: var(--green);" onclick="confirmSubmit()">Yes, submit</button>
-            <button onclick="cancelSubmit()">Cancel</button>
-        </div>
+        <span id="save-modal-title"></span>
+        <div id="save-modal-subtitle" style="font-size: 12px; color: var(--text-dim);"></div>
+        <div class="flex gap-8" id="save-modal-buttons"></div>
     </div>
 </div>
 
@@ -467,22 +465,17 @@
 <div class="save-bar" id="save-bar" style="display: none;">
     <span class="status" id="save-status">
         {% if user.submitted %}
-        <span style="color: var(--green);">Submitted {{ user.submitted_at.strftime('%b %d, %I:%M %p') if user.submitted_at else '' }}</span>
+        <span style="color: var(--green);">✓ Submitted {{ user.submitted_at.strftime('%b %d, %I:%M %p') if user.submitted_at else '' }}</span>
         {% endif %}
     </span>
     <div class="flex gap-8">
         {% if phase1_open or phase2_open %}
-        {% if user.submitted %}
-        <button onclick="editBracket()" id="edit-btn">Edit Bracket</button>
-        {% else %}
         <button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>
         {% if phase1_open %}
-        <button onclick="savePicks(1)" id="save-phase1-btn">Save R64 + R32</button>
+        <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
         {% endif %}
         {% if phase2_open %}
         <button onclick="savePicks(2)" id="save-phase2-btn">Save Rest of the Way</button>
-        {% endif %}
-        <button style="background: #0a4a0a; border-color: var(--green); color: var(--green);" onclick="showSubmitConfirm()" id="submit-btn">Submit Bracket</button>
         {% endif %}
         {% endif %}
     </div>
@@ -499,7 +492,6 @@ const RESULTS = {{ state.results | tojson }};
 const LIVE_DATA = {{ state.live | tojson }};
 const TEAMS_DATA = {{ state.teams | tojson }};
 let IS_SUBMITTED = {{ 'true' if user.submitted else 'false' }};
-let IS_READ_ONLY = IS_SUBMITTED;
 
 // Bracket progression: parent_slot -> [child1_slot, child2_slot]
 const PROGRESSION = {};
@@ -564,8 +556,6 @@ function clearPick(e, slot, teamId) {
 }
 
 function pickTeam(el) {
-    if (IS_READ_ONLY) return;
-
     const slot = el.dataset.slot;
     const teamId = parseInt(el.dataset.teamId);
     const phase = parseInt(el.dataset.phase);
@@ -698,102 +688,8 @@ function clearBracket() {
     showSaveBar();
 }
 
-function showSubmitConfirm() {
-    document.getElementById('confirm-submit').style.display = 'flex';
-}
-function cancelSubmit() {
-    document.getElementById('confirm-submit').style.display = 'none';
-}
-async function confirmSubmit() {
-    document.getElementById('confirm-submit').style.display = 'none';
-
-    // Save first, then submit
-    if (PHASE1_OPEN) await savePicks(1);
-    if (PHASE2_OPEN) await savePicks(2);
-
-    try {
-        const resp = await fetch('/bracket/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const data = await resp.json();
-        if (data.ok) {
-            IS_SUBMITTED = true;
-            IS_READ_ONLY = true;
-            applyReadOnly();
-            const status = document.getElementById('save-status');
-            status.innerHTML = '<span style="color: var(--green);">Submitted</span>';
-            // Replace buttons
-            const btnArea = document.querySelector('.save-bar .flex.gap-8');
-            btnArea.innerHTML = '<button onclick="editBracket()" id="edit-btn">Edit Bracket</button>';
-        } else {
-            document.getElementById('save-status').textContent = data.error || 'Submit failed';
-            document.getElementById('save-status').className = 'status unsaved';
-        }
-    } catch (e) {
-        document.getElementById('save-status').textContent = 'Network error';
-        document.getElementById('save-status').className = 'status unsaved';
-    }
-}
-
-async function editBracket() {
-    try {
-        const resp = await fetch('/bracket/unsubmit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const data = await resp.json();
-        if (data.ok) {
-            IS_SUBMITTED = false;
-            IS_READ_ONLY = false;
-            removeReadOnly();
-            const status = document.getElementById('save-status');
-            status.textContent = '';
-            // Replace buttons back
-            const btnArea = document.querySelector('.save-bar .flex.gap-8');
-            let html = '<button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>';
-            if (PHASE1_OPEN) html += '<button onclick="savePicks(1)" id="save-phase1-btn">Save R64 + R32</button>';
-            if (PHASE2_OPEN) html += '<button onclick="savePicks(2)" id="save-phase2-btn">Save Rest of the Way</button>';
-            html += '<button style="background: #0a4a0a; border-color: var(--green); color: var(--green);" onclick="showSubmitConfirm()" id="submit-btn">Submit Bracket</button>';
-            btnArea.innerHTML = html;
-        }
-    } catch (e) {
-        document.getElementById('save-status').textContent = 'Network error';
-    }
-}
-
-function applyReadOnly() {
-    document.querySelectorAll('.game-team:not(.locked)').forEach(el => {
-        el.classList.add('locked');
-        el.style.cursor = 'default';
-    });
-    document.querySelectorAll('.clear-pick').forEach(el => el.remove());
-}
-
-function removeReadOnly() {
-    document.querySelectorAll('.game-team.locked').forEach(el => {
-        // Only unlock teams in open phases
-        const slot = el.dataset.slot;
-        if (!slot) return;
-        const phase = phaseForSlot(slot);
-        if ((phase === 1 && PHASE1_OPEN) || (phase === 2 && PHASE2_OPEN)) {
-            el.classList.remove('locked');
-            el.style.cursor = 'pointer';
-        }
-    });
-    // Re-add X buttons
-    document.querySelectorAll('.game-team:not(.locked)').forEach(el => {
-        if (el.dataset.slot && el.dataset.teamId && !el.querySelector('.clear-pick')) {
-            const slot = el.dataset.slot;
-            if (RESULTS[slot] && RESULTS[slot].winner_id) return;
-            const teamId = parseInt(el.dataset.teamId);
-            const btn = document.createElement('span');
-            btn.className = 'clear-pick';
-            btn.innerHTML = '&times;';
-            btn.onclick = function(e) { clearPick(e, slot, teamId); };
-            el.appendChild(btn);
-        }
-    });
+function closeSaveModal() {
+    document.getElementById('save-modal').style.display = 'none';
 }
 
 function showSaveBar() {
@@ -933,7 +829,7 @@ function renderGameSlot(slot) {
     }
 }
 
-async function savePicks(phase) {
+async function savePicks(phase, skipModal) {
     const btn = document.getElementById(`save-phase${phase}-btn`);
     btn.disabled = true;
     btn.textContent = 'Saving...';
@@ -953,6 +849,28 @@ async function savePicks(phase) {
         }
     }
 
+    // Count picks client-side to check completeness before saving
+    const phase1PickCount = Object.keys(toSave).length;
+
+    // Check if bracket is incomplete and show pre-save modal
+    if (phase === 1 && !skipModal) {
+        const totalNeeded = 48; // 32 R64 + 16 R32
+        const remaining = totalNeeded - phase1PickCount;
+        if (remaining > 0) {
+            // Show incomplete modal
+            const modal = document.getElementById('save-modal');
+            document.getElementById('save-modal-title').textContent = 'Bracket incomplete';
+            document.getElementById('save-modal-subtitle').textContent = remaining + ' pick' + (remaining === 1 ? '' : 's') + ' remaining';
+            document.getElementById('save-modal-buttons').innerHTML =
+                '<button onclick="closeSaveModal(); savePicks(' + phase + ', true)">Save Progress</button>' +
+                '<button onclick="closeSaveModal()">Cancel</button>';
+            modal.style.display = 'flex';
+            btn.disabled = false;
+            btn.textContent = 'Save Bracket';
+            return;
+        }
+    }
+
     try {
         const resp = await fetch('/bracket/save', {
             method: 'POST',
@@ -963,10 +881,23 @@ async function savePicks(phase) {
         const data = await resp.json();
 
         if (data.ok) {
-            document.getElementById('save-status').textContent = 'Saved';
-            document.getElementById('save-status').className = 'status';
             hasChanges = false;
             pendingPicks = {};
+
+            // Show appropriate modal based on completeness
+            if (phase === 1 && data.bracket_complete) {
+                IS_SUBMITTED = true;
+                document.getElementById('save-status').innerHTML = '<span style="color: var(--green);">✓ Submitted</span>';
+                const modal = document.getElementById('save-modal');
+                document.getElementById('save-modal-title').innerHTML = '<span style="color: var(--green);">Bracket complete!</span>';
+                document.getElementById('save-modal-subtitle').textContent = 'Your picks have been saved.';
+                document.getElementById('save-modal-buttons').innerHTML =
+                    '<button onclick="closeSaveModal()">OK</button>';
+                modal.style.display = 'flex';
+            } else {
+                document.getElementById('save-status').textContent = 'Saved';
+                document.getElementById('save-status').className = 'status';
+            }
         } else {
             document.getElementById('save-status').textContent = data.error || 'Save failed';
             document.getElementById('save-status').className = 'status unsaved';
@@ -976,7 +907,7 @@ async function savePicks(phase) {
         document.getElementById('save-status').className = 'status unsaved';
     } finally {
         btn.disabled = false;
-        btn.textContent = phase === 1 ? 'Save R64 + R32' : 'Save Rest of the Way';
+        btn.textContent = phase === 1 ? 'Save Bracket' : 'Save Rest of the Way';
     }
 }
 
@@ -998,11 +929,6 @@ document.querySelectorAll('.game-team:not(.locked)').forEach(function(el) {
 // Show save bar if there are existing picks (for Clear Bracket access)
 if (Object.keys(picks).length > 0 && (PHASE1_OPEN || PHASE2_OPEN)) {
     document.getElementById('save-bar').style.display = 'flex';
-}
-
-// Apply read-only mode if submitted
-if (IS_READ_ONLY) {
-    applyReadOnly();
 }
 
 // Countdown timers
