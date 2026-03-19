@@ -39,6 +39,29 @@
         </form>
     </div>
 
+    <!-- Test Data (feature branch) -->
+    <div class="card mt-16">
+        <h2>Test Data</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <form method="POST" style="margin: 0;">
+                <input type="hidden" name="action" value="seed_test_results">
+                <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                <button type="submit">Seed Test Results</button>
+            </form>
+            <form method="POST" style="margin: 0;">
+                <input type="hidden" name="action" value="seed_test_entries">
+                <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                <button type="submit">Seed Test Entries</button>
+            </form>
+            <form method="POST" style="margin: 0;">
+                <input type="hidden" name="action" value="clear_test_data">
+                <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                <button type="submit" class="btn-danger">Clear Test Data</button>
+            </form>
+        </div>
+        <p style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">Seeds ~10 R64 results (mix of chalk/upsets), 4 fake users (Alice/Bob/Carol/Dan) with varied brackets. Clear removes test users, their picks, and all game results.</p>
+    </div>
+
     <div class="admin-grid">
         <!-- Record Result -->
         <div class="card">

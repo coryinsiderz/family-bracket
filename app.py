@@ -518,6 +518,174 @@ def admin_bracket_edit(user_id):
     )
 
 
+# --- Test data helpers (feature branch only) ---
+
+TEST_USER_NAMES = ["Alice", "Bob", "Carol", "Dan"]
+
+
+def _seed_test_results():
+    """Create ~10 R64 game results with a mix of chalk and upsets."""
+    teams_by_name = {t.name: t for t in Team.query.all()}
+
+    # (slot, winner_name, loser_name, winner_score, loser_score)
+    test_results = [
+        # East: 4 games
+        ("east_r64_1", "Duke", "Siena", 82, 58),          # 1 beats 16 (chalk)
+        ("east_r64_2", "TCU", "Ohio State", 71, 68),      # 9 beats 8 (mild upset)
+        ("east_r64_3", "Northern Iowa", "St. John's", 74, 70),  # 12 beats 5 (upset!)
+        ("east_r64_4", "Kansas", "Cal Baptist", 90, 62),   # 4 beats 13 (chalk)
+        # West: 3 games
+        ("west_r64_1", "Arizona", "LIU", 95, 55),         # 1 beats 16 (chalk)
+        ("west_r64_3", "High Point", "Wisconsin", 67, 65), # 12 beats 5 (upset!)
+        ("west_r64_8", "Purdue", "Queens", 88, 60),        # 2 beats 15 (chalk)
+        # South: 3 games
+        ("south_r64_2", "Iowa", "Clemson", 75, 72),        # 9 beats 8 (mild upset)
+        ("south_r64_6", "Illinois", "Penn", 81, 59),       # 3 beats 14 (chalk)
+        ("south_r64_8", "Houston", "Idaho", 92, 54),       # 2 beats 15 (chalk)
+    ]
+
+    count = 0
+    for slot, winner_name, loser_name, w_score, l_score in test_results:
+        if GameResult.query.filter_by(game_slot=slot).first():
+            continue  # skip if already exists
+        winner = teams_by_name.get(winner_name)
+        loser = teams_by_name.get(loser_name)
+        if not winner or not loser:
+            continue
+        # Determine team1/team2 ordering from R64_MATCHUPS
+        round_key = get_round_for_slot(slot)
+        round_num = ROUNDS.get(round_key, {}).get("number", 1)
+        # team1 is always the higher seed (lower number)
+        if winner.seed <= loser.seed:
+            t1, t2, s1, s2 = winner, loser, w_score, l_score
+        else:
+            t1, t2, s1, s2 = loser, winner, l_score, w_score
+        result = GameResult(
+            game_slot=slot,
+            team1_id=t1.id, team1_seed=t1.seed,
+            team2_id=t2.id, team2_seed=t2.seed,
+            winner_id=winner.id,
+            round_number=round_num,
+            score_team1=s1, score_team2=s2,
+        )
+        db.session.add(result)
+        count += 1
+    db.session.commit()
+    flash(f"Seeded {count} test results")
+
+
+def _seed_test_entries():
+    """Create 4 test users with varied R64+R32 brackets."""
+    import random
+    teams_by_name = {t.name: t for t in Team.query.all()}
+
+    # R64 matchups: list of (slot, team1_name, seed1, team2_name, seed2)
+    r64_games = []
+    for region in REGIONS:
+        for idx, (s1, n1, s2, n2) in enumerate(R64_MATCHUPS[region]):
+            slot = f"{region}_r64_{idx + 1}"
+            # Resolve FF teams to actual winners or first option
+            if n1 is None:
+                ff_key = (region, idx)
+                ff_slot = FIRST_FOUR_SLOTS.get(ff_key)
+                if ff_slot:
+                    ff_result = GameResult.query.filter_by(game_slot=ff_slot).first()
+                    if ff_result and ff_result.winner:
+                        n1 = ff_result.winner.name
+                    else:
+                        n1 = FIRST_FOUR[ff_slot][0]
+            if n2 is None:
+                ff_key = (region, idx)
+                ff_slot = FIRST_FOUR_SLOTS.get(ff_key)
+                if ff_slot:
+                    ff_result = GameResult.query.filter_by(game_slot=ff_slot).first()
+                    if ff_result and ff_result.winner:
+                        n2 = ff_result.winner.name
+                    else:
+                        n2 = FIRST_FOUR[ff_slot][0]
+            if n1 and n2:
+                r64_games.append((slot, n1, s1, n2, s2))
+
+    # Pick profiles: probability of picking the higher seed
+    # chalk_heavy=0.9, balanced=0.65, upset_lover=0.35, random=0.5
+    profiles = [
+        ("Alice", 0.90),   # chalk heavy
+        ("Bob", 0.65),     # balanced
+        ("Carol", 0.35),   # upset lover
+        ("Dan", 0.50),     # coin flip
+    ]
+
+    random.seed(42)  # deterministic for reproducibility
+    count = 0
+    for name, chalk_prob in profiles:
+        user = User.query.filter_by(name=name).first()
+        if not user:
+            user = User(name=name, password_hash="")
+            db.session.add(user)
+            db.session.flush()
+
+        # Clear existing picks
+        Pick.query.filter_by(user_id=user.id).delete()
+
+        r64_winners = {}  # slot -> team_name picked
+
+        # R64 picks
+        for slot, n1, s1, n2, s2 in r64_games:
+            t1 = teams_by_name.get(n1)
+            t2 = teams_by_name.get(n2)
+            if not t1 or not t2:
+                continue
+            # Higher seed = lower seed number
+            if s1 <= s2:
+                higher, lower = t1, t2
+            else:
+                higher, lower = t2, t1
+            pick = higher if random.random() < chalk_prob else lower
+            db.session.add(Pick(user_id=user.id, game_slot=slot,
+                                picked_team_id=pick.id, phase=1))
+            r64_winners[slot] = pick
+
+        # R32 picks: winner of each R64 pair
+        for region in REGIONS:
+            for pair in range(1, 5):
+                r32_slot = f"{region}_r32_{pair}"
+                feeder1 = f"{region}_r64_{pair * 2 - 1}"
+                feeder2 = f"{region}_r64_{pair * 2}"
+                pick1 = r64_winners.get(feeder1)
+                pick2 = r64_winners.get(feeder2)
+                if not pick1 or not pick2:
+                    continue
+                if pick1.seed <= pick2.seed:
+                    higher, lower = pick1, pick2
+                else:
+                    higher, lower = pick2, pick1
+                pick = higher if random.random() < chalk_prob else lower
+                db.session.add(Pick(user_id=user.id, game_slot=r32_slot,
+                                    picked_team_id=pick.id, phase=1))
+
+        user.submitted = True
+        user.submitted_at = now_et()
+        count += 1
+
+    db.session.commit()
+    flash(f"Seeded {count} test users with brackets")
+
+
+def _clear_test_data():
+    """Remove test users/picks and all game results."""
+    # Delete test users and their picks
+    for name in TEST_USER_NAMES:
+        user = User.query.filter_by(name=name).first()
+        if user:
+            Pick.query.filter_by(user_id=user.id).delete()
+            db.session.delete(user)
+
+    # Delete all game results
+    GameResult.query.delete()
+    db.session.commit()
+    flash("Cleared all test data (test users, picks, results)")
+
+
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     pw = request.args.get("pw") or request.form.get("pw") or session.get("admin_pw")
@@ -590,6 +758,15 @@ def admin():
                 db.session.add(new_user)
                 db.session.commit()
                 flash(f"Created user '{name}'")
+
+        elif action == "seed_test_results":
+            _seed_test_results()
+
+        elif action == "seed_test_entries":
+            _seed_test_entries()
+
+        elif action == "clear_test_data":
+            _clear_test_data()
 
     teams = {t.id: t for t in Team.query.all()}
     results = {r.game_slot: r for r in GameResult.query.all()}
