@@ -323,7 +323,7 @@ function applyOverlay(mode) {
 function clearOverlays() {
     document.querySelectorAll('.master-team').forEach(el => {
         el.classList.remove('overlay-correct', 'overlay-wrong', 'overlay-pending',
-                           'overlay-match', 'overlay-swing', 'overlay-gained', 'overlay-lost',
+                           'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong',
                            'lev-high', 'lev-med', 'lev-low',
                            'whatif-sim', 'whatif-simwin');
         const ann = el.querySelector('.overlay-ann');
@@ -709,14 +709,15 @@ function applyVsPlayer() {
     const controlsEl = document.getElementById('overlay-controls');
     controlsEl.style.display = 'block';
 
-    // Build player dropdown
+    // Build player dropdown with orange label for compared player
     const otherUsers = USERS.filter(u => u.id !== VIEWING_USER_ID);
-    let html = '<label style="margin-right: 8px;">Compare with:</label><select id="vs-player-select">';
-    html += '<option value="">-- Select --</option>';
+    let html = '<label style="margin-right: 8px;">Compare with:</label><select id="vs-player-select" class="vs-player-label">';
+    html += '<option value="" style="color: var(--text);">-- Select --</option>';
     otherUsers.forEach(u => {
         html += `<option value="${u.id}">${u.name}</option>`;
     });
     html += '</select>';
+    html += '<span style="margin-left: 16px; font-size: 11px;"><span style="color: #4285f4;">&#9632;</span> You &nbsp; <span style="color: #ffa000;">&#9632;</span> Them</span>';
     controlsEl.innerHTML = html;
 
     document.getElementById('vs-player-select').addEventListener('change', (e) => {
@@ -727,6 +728,7 @@ function applyVsPlayer() {
 }
 
 function renderVsPlayer(opponentId) {
+    injectProjectedPicks(VIEWING_USER_ID);
     const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
     const theirPicks = ALL_PICKS[opponentId] || {};
     const opponentName = USERS.find(u => u.id === opponentId)?.name || '?';
@@ -747,61 +749,49 @@ function renderVsPlayer(opponentId) {
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
         const samePick = myPick === theirPick;
 
-        if (samePick) {
-            // Same pick — dim these games
+        if (samePick && myPick) {
+            // Same pick — dim/grey, doesn't matter
             teamEls.forEach(el => {
                 if (parseInt(el.dataset.teamId) === myPick) {
                     el.classList.add('overlay-match');
                 }
             });
-        } else {
-            // Different picks
+        } else if (myPick || theirPick) {
+            // Different picks (or only one person picked)
             if (result && result.winner_id) {
-                // Completed: who was right?
-                const seed1 = getSeed(result.team1_id);
-                const seed2 = getSeed(result.team2_id);
-                const bonus = calcUpsetBonus(seed1, seed2);
-                const pts = roundPts + bonus;
-
+                // Completed game with divergent picks
                 teamEls.forEach(el => {
                     const tid = parseInt(el.dataset.teamId);
                     if (tid === myPick) {
-                        if (myPick === result.winner_id) {
-                            el.classList.add('overlay-gained');
-                            addAnnotation(el, `+${pts} on ${opponentName}`);
-                        } else {
-                            el.classList.add('overlay-lost');
-                        }
+                        el.classList.add('vs-you');
+                        el.classList.add(myPick === result.winner_id ? 'vs-correct' : 'vs-wrong');
                     }
                     if (tid === theirPick) {
-                        if (theirPick === result.winner_id) {
-                            el.classList.add('overlay-lost');
-                            addAnnotation(el, `${opponentName} +${pts}`);
-                        } else {
-                            el.classList.add('overlay-gained');
-                        }
+                        el.classList.add('vs-them');
+                        el.classList.add(theirPick === result.winner_id ? 'vs-correct' : 'vs-wrong');
                     }
                 });
             } else {
                 // Upcoming: swing game
-                let seed1 = 0, seed2 = 0;
-                teamEls.forEach(el => {
-                    const s = parseInt(el.dataset.seed) || 0;
-                    if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
-                });
-                const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
-                const pts = roundPts + bonus;
-                swingGames++;
-                maxSwingPts += pts;
+                if (myPick && theirPick && myPick !== theirPick) {
+                    let seed1 = 0, seed2 = 0;
+                    teamEls.forEach(el => {
+                        const s = parseInt(el.dataset.seed) || 0;
+                        if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
+                    });
+                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+                    const pts = roundPts + bonus;
+                    swingGames++;
+                    maxSwingPts += pts;
+                }
 
                 teamEls.forEach(el => {
                     const tid = parseInt(el.dataset.teamId);
                     if (tid === myPick) {
-                        el.classList.add('overlay-swing');
-                        addAnnotation(el, `You`);
-                    } else if (tid === theirPick) {
-                        el.classList.add('overlay-swing');
-                        addAnnotation(el, opponentName);
+                        el.classList.add('vs-you');
+                    }
+                    if (tid === theirPick) {
+                        el.classList.add('vs-them');
                     }
                 });
             }
@@ -816,7 +806,7 @@ function renderVsPlayer(opponentId) {
     const diff = myTotal - theirTotal;
     const diffStr = diff > 0 ? `${diff} pts ahead` : diff < 0 ? `${Math.abs(diff)} pts back` : 'tied';
     document.getElementById('master-summary').innerHTML =
-        `You: <strong>${myTotal}</strong> | ${opponentName}: <strong>${theirTotal}</strong> | ${diffStr} | <strong>${swingGames}</strong> swing games (up to ${maxSwingPts} pts)`;
+        `<span style="color: #4285f4;">You: <strong>${myTotal}</strong></span> | <span class="vs-player-label">${opponentName}: <strong>${theirTotal}</strong></span> | ${diffStr} | <strong>${swingGames}</strong> swing games (up to ${maxSwingPts} pts)`;
 }
 
 // === WHAT IF OVERLAY ===

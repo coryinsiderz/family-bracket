@@ -747,22 +747,25 @@ button:disabled {
 }
 
 /* vs Player classes */
-.overlay-match { opacity: 0.35 !important; }
-.overlay-swing {
-    background: rgba(255, 179, 0, 0.2) !important;
-    border-left: 3px solid var(--yellow) !important;
+.overlay-match {
+    opacity: 0.4 !important;
+    background: rgba(200, 200, 200, 0.08) !important;
+}
+.vs-you {
+    background: rgba(66, 133, 244, 0.2) !important;
+    border-left: 3px solid #4285f4 !important;
     opacity: 1 !important;
 }
-.overlay-gained {
-    background: rgba(76, 175, 80, 0.2) !important;
-    border-left: 3px solid var(--green) !important;
+.vs-you.vs-correct .name { font-weight: 700; }
+.vs-you.vs-wrong .name { text-decoration: line-through; opacity: 0.6; }
+.vs-them {
+    background: rgba(255, 160, 0, 0.2) !important;
+    border-left: 3px solid #ffa000 !important;
     opacity: 1 !important;
 }
-.overlay-lost {
-    background: rgba(229, 57, 53, 0.15) !important;
-    border-left: 3px solid var(--red) !important;
-    opacity: 1 !important;
-}
+.vs-them.vs-correct .name { font-weight: 700; }
+.vs-them.vs-wrong .name { text-decoration: line-through; opacity: 0.6; }
+.vs-player-label { color: #ffa000; font-weight: 600; }
 
 /* Leverage modal */
 .lev-modal-overlay {
