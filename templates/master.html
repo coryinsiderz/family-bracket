@@ -298,14 +298,11 @@ function clearOverlays() {
 }
 
 // Inject projected picks from a user into TBD slots on the bracket.
-// Builds the full projected bracket: R32 picks populate S16 matchups,
-// S16 picks populate E8, etc.
+// Two passes: (1) show user's pick in each game slot, (2) propagate
+// winners to parent slots (R32 winners -> S16, etc.)
 function injectProjectedPicks(userId) {
     const picks = ALL_PICKS[userId] || {};
 
-    // Process slots in round order so earlier projections feed later ones.
-    // For each slot with a pick, the winner should appear in the parent slot.
-    // Slot order: R32 -> S16 -> E8 -> F4 -> Championship
     const slotOrder = [];
     const regions = ['east', 'west', 'midwest', 'south'];
     for (const r of regions) {
@@ -317,27 +314,13 @@ function injectProjectedPicks(userId) {
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
     slotOrder.push('f4_1', 'f4_2', 'championship');
 
-    for (const slot of slotOrder) {
-        const teamId = picks[slot];
-        if (!teamId) continue;
-
+    function injectTeam(targetSlot, teamId) {
         const team = TEAMS[teamId];
-        if (!team) continue;
-
-        // Inject into the parent game (the game this slot feeds into)
-        const fi = FEEDS_INTO[slot];
-        if (!fi) continue;
-
-        const parentSlot = fi.parent;
-        const parentEl = document.getElementById('mgame-' + parentSlot);
-        if (!parentEl) continue;
-
-        // Check if this team is already shown in the parent game
-        const existing = parentEl.querySelector(`.master-team[data-team-id="${teamId}"]`);
-        if (existing) continue;
-
-        // Find a TBD to replace in the parent
-        const tbdEls = parentEl.querySelectorAll('.master-tbd');
+        if (!team) return;
+        const el = document.getElementById('mgame-' + targetSlot);
+        if (!el) return;
+        if (el.querySelector(`.master-team[data-team-id="${teamId}"]`)) return;
+        const tbdEls = el.querySelectorAll('.master-tbd');
         for (let i = 0; i < tbdEls.length; i++) {
             const tbd = tbdEls[i];
             if (tbd.classList.contains('master-tbd-hidden')) continue;
@@ -345,7 +328,7 @@ function injectProjectedPicks(userId) {
             tbd.style.display = 'none';
             const proj = document.createElement('div');
             proj.className = 'game-team master-team master-projected overlay-pending';
-            proj.dataset.slot = parentSlot;
+            proj.dataset.slot = targetSlot;
             proj.dataset.teamId = teamId;
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
@@ -353,6 +336,18 @@ function injectProjectedPicks(userId) {
             tbd.parentNode.insertBefore(proj, tbd);
             break;
         }
+    }
+
+    for (const slot of slotOrder) {
+        const teamId = picks[slot];
+        if (!teamId) continue;
+
+        // Pass 1: show the picked team in THIS game's slot
+        injectTeam(slot, teamId);
+
+        // Pass 2: propagate the winner to the parent game
+        const fi = FEEDS_INTO[slot];
+        if (fi) injectTeam(fi.parent, teamId);
     }
 }
 
