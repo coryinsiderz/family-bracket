@@ -535,26 +535,31 @@ function applyMyPicks() {
 
             // Feeder game is complete
             if (eliminated.has(tid)) {
-                // User's pick has been eliminated
                 el.classList.add('overlay-wrong');
             } else {
-                // User's pick is still alive (won feeder game)
                 el.classList.add('overlay-correct');
-                // Add point annotation if user correctly picked this feeder
-                if (feederResult.winner_id === tid) {
-                    const rp = getRoundPoints(feederSlot);
-                    const winnerSeed = getSeed(feederResult.winner_id);
-                    const bonus = calcUpsetBonus(
-                        getSeed(feederResult.team1_id), getSeed(feederResult.team2_id), winnerSeed);
-                    totalPts += rp + bonus;
-                    correctCount++;
+            }
+        });
+
+        // Point annotation: if THIS game has a result and user's winner pick won
+        const result = RESULTS[slot];
+        if (result && result.winner_id && winnerPick === result.winner_id) {
+            const rp = getRoundPoints(slot);
+            const winnerSeed = getSeed(result.winner_id);
+            const bonus = calcUpsetBonus(
+                getSeed(result.team1_id), getSeed(result.team2_id), winnerSeed);
+            totalPts += rp + bonus;
+            correctCount++;
+            // Add annotation to the winner team element
+            gameEl.querySelectorAll('.master-projected').forEach(el => {
+                if (parseInt(el.dataset.teamId) === winnerPick) {
                     const ptsEl = document.createElement('span');
                     ptsEl.className = 'overlay-pts';
                     ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
                     el.appendChild(ptsEl);
                 }
-            }
-        });
+            });
+        }
     });
 
     // Find user rank from board

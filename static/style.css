@@ -691,17 +691,18 @@ button:disabled {
 
 /* Overlay classes (used by toggles) */
 .overlay-correct {
-    background: rgba(76, 175, 80, 0.2) !important;
-    border-left: 3px solid var(--green) !important;
+    background: #0a2a0a !important;
+    border-left: 2px solid var(--green) !important;
     opacity: 1 !important;
 }
 .overlay-wrong {
-    background: rgba(229, 57, 53, 0.2) !important;
-    border-left: 3px solid var(--red) !important;
-    opacity: 1 !important;
+    background: #2a1515 !important;
+    border-left: 2px solid var(--red) !important;
+    opacity: 0.8 !important;
 }
 .overlay-wrong .name {
     text-decoration: line-through;
+    opacity: 0.7;
 }
 .overlay-pending {
     opacity: 1 !important;

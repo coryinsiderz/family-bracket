@@ -509,6 +509,7 @@ const TEAMS_DATA = {{ state.teams | tojson }};
 let IS_SUBMITTED = {{ 'true' if user.submitted else 'false' }};
 const ADMIN_EDIT = {{ 'true' if admin_edit is defined and admin_edit else 'false' }};
 const ADMIN_VIEW = {{ 'true' if admin_view is defined and admin_view else 'false' }};
+const USER_PICKS = {{ state.picks | tojson }};
 const TARGET_USER_ID = {{ target_user_id if target_user_id is defined and target_user_id else 'null' }};
 
 // Bracket progression: parent_slot -> [child1_slot, child2_slot]
@@ -1468,5 +1469,54 @@ function applyPastedPicks() {
     // Auto-save with skipModal=true
     savePicks(1, true);
 }
+
+// === Point annotations on correct picks ===
+const ROUND_POINTS = {r64: 1, r32: 2, s16: 3, e8: 4, f4: 5, championship: 6};
+
+function bracketGetRound(slot) {
+    if (slot === 'championship') return 'championship';
+    if (slot.startsWith('f4_')) return 'f4';
+    if (slot.startsWith('ff_')) return 'ff';
+    return slot.split('_')[1];
+}
+
+function bracketCalcUpsetBonus(seed1, seed2, winnerSeed) {
+    const fav = Math.min(seed1, seed2);
+    const dog = Math.max(seed1, seed2);
+    if (fav === 0 || fav === dog || winnerSeed !== dog) return 0;
+    return Math.round(dog / fav);
+}
+
+// Add point annotations to correct picks on the bracket page
+(function addBracketAnnotations() {
+    document.querySelectorAll('.game[id^="game-"]').forEach(gameEl => {
+        const slot = gameEl.id.replace('game-', '');
+        const rk = bracketGetRound(slot);
+        if (rk === 'ff') return;
+        const rp = ROUND_POINTS[rk] || 0;
+        if (!rp) return;
+
+        const result = RESULTS[slot];
+        if (!result || !result.winner_id) return;
+
+        // Check if user picked the winner of this game
+        const userPick = USER_PICKS[slot];
+        if (userPick !== result.winner_id) return;
+
+        // Find the winner's team element
+        const winnerEl = gameEl.querySelector(`.game-team[data-team-id="${result.winner_id}"]`);
+        if (!winnerEl) return;
+
+        const s1 = TEAMS_DATA[result.team1_id]?.seed || 0;
+        const s2 = TEAMS_DATA[result.team2_id]?.seed || 0;
+        const winnerSeed = TEAMS_DATA[result.winner_id]?.seed || 0;
+        const bonus = bracketCalcUpsetBonus(s1, s2, winnerSeed);
+        const ptsEl = document.createElement('span');
+        ptsEl.className = 'overlay-pts';
+        ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
+        ptsEl.style.marginLeft = '4px';
+        winnerEl.appendChild(ptsEl);
+    });
+})();
 </script>
 {% endblock %}
