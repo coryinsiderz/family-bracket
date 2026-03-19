@@ -7,13 +7,17 @@ from bracket_data import ROUNDS, get_round_for_slot
 def calculate_upset_bonus(team1_seed, team2_seed, winner_seed):
     """
     Calculate upset bonus for a correct pick.
-    Bonus = round(lower_seed / higher_seed) where lower_seed is the
-    numerically higher seed number.
-    Applied based on the actual seeds of the two teams in the real game.
+    Bonus = round(higher_seed_number / lower_seed_number) ONLY when the
+    numerically higher seed (underdog) wins.
+    e.g. 13-seed beats 4-seed: bonus = round(13/4) = 3
+         4-seed beats 13-seed: no bonus (favorite won)
     """
-    higher_seed = min(team1_seed, team2_seed)
-    lower_seed = max(team1_seed, team2_seed)
-    if higher_seed == 0:
+    higher_seed = min(team1_seed, team2_seed)  # favorite (lower number)
+    lower_seed = max(team1_seed, team2_seed)   # underdog (higher number)
+    if higher_seed == 0 or higher_seed == lower_seed:
+        return 0
+    # Only award bonus when the underdog (higher seed number) wins
+    if winner_seed != lower_seed:
         return 0
     return round(lower_seed / higher_seed)
 
@@ -38,8 +42,13 @@ def score_pick(pick, game_result):
         return 0, 0
 
     round_points = round_info["points"]
+    # Determine winner's seed
+    if game_result.winner_id == game_result.team1_id:
+        winner_seed = game_result.team1_seed
+    else:
+        winner_seed = game_result.team2_seed
     bonus = calculate_upset_bonus(
-        game_result.team1_seed, game_result.team2_seed, 0
+        game_result.team1_seed, game_result.team2_seed, winner_seed
     )
 
     return round_points, bonus
