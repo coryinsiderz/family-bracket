@@ -756,8 +756,9 @@ button:disabled {
 
 /* vs Player classes */
 .overlay-match {
-    opacity: 0.4 !important;
-    background: rgba(200, 200, 200, 0.08) !important;
+    opacity: 1 !important;
+    background: rgba(0, 180, 180, 0.15) !important;
+    border-left: 3px solid #2a8a8a !important;
 }
 .vs-you {
     background: rgba(66, 133, 244, 0.2) !important;
@@ -778,6 +779,7 @@ button:disabled {
     border-left: 3px solid #9c27b0 !important;
     opacity: 1 !important;
 }
+.pick-eliminated .name { text-decoration: line-through; opacity: 0.6; }
 .vs-player-label { color: #ffa000; font-weight: 600; }
 
 /* Leverage modal */

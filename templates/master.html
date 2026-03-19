@@ -325,7 +325,7 @@ function clearOverlays() {
     document.querySelectorAll('.master-team').forEach(el => {
         el.classList.remove('overlay-correct', 'overlay-wrong', 'overlay-pending',
                            'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong', 'vs-diff',
-                           'lev-high', 'lev-med', 'lev-low',
+                           'pick-eliminated', 'lev-high', 'lev-med', 'lev-low',
                            'whatif-sim', 'whatif-simwin');
         const ann = el.querySelector('.overlay-ann');
         if (ann) ann.remove();
@@ -356,7 +356,7 @@ function injectProjectedPicks(userId) {
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
     slotOrder.push('f4_1', 'f4_2', 'championship');
 
-    function injectTeam(targetSlot, teamId) {
+    function injectTeam(targetSlot, teamId, feederSlot) {
         const team = TEAMS[teamId];
         if (!team) return;
         const el = document.getElementById('mgame-' + targetSlot);
@@ -374,6 +374,7 @@ function injectProjectedPicks(userId) {
             proj.dataset.teamId = teamId;
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
+            if (feederSlot) proj.dataset.feederSlot = feederSlot;
             proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
             tbd.parentNode.insertBefore(proj, tbd);
             break;
@@ -390,9 +391,20 @@ function injectProjectedPicks(userId) {
             if (feederResult && feederResult.winner_id) continue;
             const feederPick = picks[feederSlot];
             if (!feederPick) continue;
-            injectTeam(slot, feederPick);
+            injectTeam(slot, feederPick, feederSlot);
         }
     }
+}
+
+// Mark projected picks that are eliminated with strikethrough
+function markEliminatedProjections() {
+    const eliminated = getEliminatedTeams();
+    document.querySelectorAll('.master-projected').forEach(el => {
+        const tid = parseInt(el.dataset.teamId);
+        if (eliminated.has(tid)) {
+            el.classList.add('pick-eliminated');
+        }
+    });
 }
 
 // === HELPER: get round info for a slot ===
@@ -611,6 +623,7 @@ function calcFieldScores(slot, winnerId, winnerSeed, loserSeed, playerIds) {
 
 function applyLeverage() {
     injectProjectedPicks(VIEWING_USER_ID);
+    markEliminatedProjections();
     setupLevDelegation();
 
     // No visual coloring at all — just make R32+ games clickable for modal
@@ -801,7 +814,7 @@ function applyVsPlayer() {
     html += '<span style="margin-left: 16px; font-size: 11px;">';
     html += '<span style="color: #4285f4;">&#9632;</span> You &nbsp;';
     html += '<span style="color: #ffa000;">&#9632;</span> Them &nbsp;';
-    html += '<span style="color: #888;">&#9632;</span> Same &nbsp;';
+    html += '<span style="color: #2a8a8a;">&#9632;</span> Same &nbsp;';
     html += '<span style="color: #9c27b0;">&#9632;</span> Different';
     html += '</span>';
     controlsEl.innerHTML = html;
@@ -816,6 +829,7 @@ function applyVsPlayer() {
 function renderVsPlayer(opponentId) {
     // Show actual results (not user's picks) — inject projected for pending feeders
     injectProjectedPicks(VIEWING_USER_ID);
+    markEliminatedProjections();
     const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
     const theirPicks = ALL_PICKS[opponentId] || {};
     const opponentName = USERS.find(u => u.id === opponentId)?.name || '?';
@@ -850,24 +864,26 @@ function renderVsPlayer(opponentId) {
             const theyPicked = feederSlot ? theirPicks[feederSlot] === tid : false;
 
             if (isProjected) {
-                // Pending feeder — check if picks differ for this slot
-                const mySlotPick = myPicks[slot];
-                const theirSlotPick = theirPicks[slot];
-                if (mySlotPick && theirSlotPick && mySlotPick !== theirSlotPick) {
-                    // Different picks — purple for swing
-                    el.classList.add('vs-diff');
-                    swingGames++;
-                    // Estimate max points
-                    let seed1 = 0, seed2 = 0;
-                    teamEls.forEach(te => {
-                        const s = parseInt(te.dataset.seed) || 0;
-                        if (s) { if (!seed1) seed1 = s; else seed2 = s; }
-                    });
-                    const underdog = Math.max(seed1, seed2);
-                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, underdog) : 0;
-                    maxSwingPts += roundPts + bonus;
-                } else if (mySlotPick === theirSlotPick && mySlotPick) {
-                    el.classList.add('overlay-match');
+                // Projected team — compare feeder picks
+                const projFeeder = el.dataset.feederSlot;
+                if (projFeeder) {
+                    const iPickedThis = myPicks[projFeeder] === tid;
+                    const theyPickedThis = theirPicks[projFeeder] === tid;
+                    if (iPickedThis && theyPickedThis) {
+                        el.classList.add('overlay-match'); // teal — both picked same
+                    } else if (iPickedThis && !theyPickedThis) {
+                        el.classList.add('vs-you'); // blue — only me
+                    } else if (!iPickedThis && theyPickedThis) {
+                        el.classList.add('vs-them'); // orange — only them
+                    } else {
+                        // Neither picked this specific team for this feeder
+                        // Check if picks differ for the feeder slot
+                        const myFeederPick = myPicks[projFeeder];
+                        const theirFeederPick = theirPicks[projFeeder];
+                        if (myFeederPick && theirFeederPick && myFeederPick !== theirFeederPick) {
+                            el.classList.add('vs-diff'); // purple — different picks
+                        }
+                    }
                 }
                 return;
             }
@@ -882,6 +898,27 @@ function renderVsPlayer(opponentId) {
             }
             // If neither picked this team, no color
         });
+
+        // Count swing games: pending feeders where picks differ
+        if (!result || !result.winner_id) {
+            for (const fSlot of feeders) {
+                if (RESULTS[fSlot] && RESULTS[fSlot].winner_id) continue; // feeder resolved
+                const myF = myPicks[fSlot];
+                const theirF = theirPicks[fSlot];
+                if (myF && theirF && myF !== theirF) {
+                    swingGames++;
+                    let seed1 = 0, seed2 = 0;
+                    teamEls.forEach(te => {
+                        const s = parseInt(te.dataset.seed) || 0;
+                        if (s) { if (!seed1) seed1 = s; else seed2 = s; }
+                    });
+                    const underdog = Math.max(seed1, seed2);
+                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, underdog) : 0;
+                    maxSwingPts += roundPts + bonus;
+                    break; // count once per game slot
+                }
+            }
+        }
     });
 
     // Summary
