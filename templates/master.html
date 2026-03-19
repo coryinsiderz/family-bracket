@@ -326,6 +326,9 @@ function clearOverlays() {
                            'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong',
                            'lev-high', 'lev-med', 'lev-low',
                            'whatif-sim', 'whatif-simwin');
+        // Restore master-winner/master-loser if they were stripped
+        if (el.dataset.origWinner === '1') el.classList.add('master-winner');
+        if (el.dataset.origLoser === '1') el.classList.add('master-loser');
         const ann = el.querySelector('.overlay-ann');
         if (ann) ann.remove();
         const pts = el.querySelector('.overlay-pts');
@@ -434,7 +437,13 @@ function applyMyPicks() {
         const rk = getRoundForSlot(slot);
 
         if (rk === 'r64') {
-            // R64: only point annotations on correct picks, no colors
+            // R64: strip ALL colors (winner/loser), add point annotation only
+            const teamEls = gameEl.querySelectorAll('.master-team');
+            teamEls.forEach(el => {
+                if (el.classList.contains('master-winner')) el.dataset.origWinner = '1';
+                if (el.classList.contains('master-loser')) el.dataset.origLoser = '1';
+                el.classList.remove('master-winner', 'master-loser');
+            });
             const result = RESULTS[slot];
             const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
             if (result && result.winner_id && pickTeamId === result.winner_id) {
@@ -444,7 +453,6 @@ function applyMyPicks() {
                     getSeed(result.team1_id), getSeed(result.team2_id), winnerSeed);
                 totalPts += rp + bonus;
                 correctCount++;
-                const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
                 teamEls.forEach(el => {
                     if (parseInt(el.dataset.teamId) === pickTeamId) {
                         const ptsEl = document.createElement('span');
