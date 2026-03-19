@@ -1,0 +1,666 @@
+{% extends "base.html" %}
+{% block title %}Master Bracket - Bracket Pool{% endblock %}
+
+{# Macro for rendering a game (2 teams + live info) in read-only ground truth mode #}
+{% macro render_game(slot, game, state, tbd_label='TBD') %}
+<div class="game master-game" id="mgame-{{ slot }}" data-slot="{{ slot }}">
+    {% for team_key in ['team1', 'team2'] %}
+    {% set team = game[team_key] %}
+    {% set result = state.results.get(slot) %}
+    {% set live = state.live.get(slot) %}
+    {% set is_winner = result and result.winner_id == team.id if (result and team) else false %}
+    {% set is_loser = result and result.winner_id and result.winner_id != team.id if (result and team) else false %}
+    {% if team %}
+    <div class="game-team master-team {{ 'master-winner' if is_winner else '' }} {{ 'master-loser' if is_loser else '' }}"
+         data-slot="{{ slot }}"
+         data-team-id="{{ team.id }}"
+         data-seed="{{ team.seed }}"
+         data-name="{{ team.name }}">
+        <span class="seed">{{ team.seed }}</span>
+        <span class="name">{{ team.name }}</span>
+        {% if loop.index == 1 and result and result.score_team1 is not none %}
+        <span class="score">{{ result.score_team1 }}</span>
+        {% elif loop.index == 2 and result and result.score_team2 is not none %}
+        <span class="score">{{ result.score_team2 }}</span>
+        {% elif live and live.status == 'in_progress' %}
+        <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="game-team master-team master-tbd">
+        <span class="seed">-</span>
+        <span class="name">{{ tbd_label }}</span>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% set live = state.live.get(slot) %}
+    {% if live and live.status == 'scheduled' %}
+    <div class="game-info">{{ live.tip_time }}</div>
+    {% elif live and live.status == 'in_progress' and live.clock %}
+    <div class="game-info live-clock">LIVE {{ live.clock }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="container">
+    <!-- Toggle bar -->
+    <div class="master-toggle-bar">
+        <div class="master-toggles">
+            <button class="master-toggle active" data-mode="off">Results</button>
+            <button class="master-toggle" data-mode="picks">My Picks</button>
+            <button class="master-toggle" data-mode="leverage">Leverage</button>
+            <button class="master-toggle" data-mode="vs">vs Player</button>
+            <button class="master-toggle" data-mode="whatif">What If</button>
+        </div>
+        <div id="master-summary" class="master-summary"></div>
+    </div>
+
+    <!-- Overlay-specific controls (hidden by default) -->
+    <div id="overlay-controls" class="overlay-controls" style="display: none;"></div>
+
+    <!-- Regions -->
+    <div id="master-bracket-wrapper">
+    {% for region in regions %}
+    <div class="bracket-region">
+        <div class="region-header">{{ region | upper }}</div>
+        <div class="bracket-container">
+            <div class="bracket-grid">
+                <!-- R64 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Round of 64</div>
+                    <div class="bracket-games">
+                    {% for i in range(1, 9) %}
+                    {% set slot = region ~ '_r64_' ~ i %}
+                    {% set game = state.r64.get(slot) %}
+                    {% if game %}
+                        {# Handle First Four slots: all FF games are resolved, show winners #}
+                        {% if game.ff_slot %}
+                            {% set ff = state.first_four[game.ff_slot] %}
+                            {% if ff.result and ff.result.winner_id %}
+                                {% set ff_winner = state.teams[ff.result.winner_id] %}
+                                {% set patched_game = {'team1': game.team1, 'team2': {'id': ff_winner.id, 'name': ff_winner.name, 'seed': ff_winner.seed}} %}
+                                {{ render_game(slot, patched_game, state) }}
+                            {% else %}
+                                {{ render_game(slot, game, state) }}
+                            {% endif %}
+                        {% else %}
+                            {{ render_game(slot, game, state) }}
+                        {% endif %}
+                    {% endif %}
+                    {% endfor %}
+                    </div>
+                </div>
+
+                <!-- R32 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Round of 32</div>
+                    <div class="bracket-games">
+                    {% for i in range(1, 5) %}
+                    {% set slot = region ~ '_r32_' ~ i %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state) }}
+                    {% endif %}
+                    {% endfor %}
+                    </div>
+                </div>
+
+                <!-- S16 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Sweet 16</div>
+                    <div class="bracket-games">
+                    {% for i in range(1, 3) %}
+                    {% set slot = region ~ '_s16_' ~ i %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state) }}
+                    {% endif %}
+                    {% endfor %}
+                    </div>
+                </div>
+
+                <!-- E8 -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Elite 8</div>
+                    <div class="bracket-games">
+                    {% set slot = region ~ '_e8_1' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state) }}
+                    {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Final Four + Championship -->
+    <div class="final-four-section">
+        <div class="region-header">Final Four & Championship</div>
+        <div class="bracket-container">
+            <div class="final-four-grid">
+                <!-- F4 Game 1: East vs West -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Final Four</div>
+                    {% set slot = 'f4_1' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state, 'TBD (East/West)') }}
+                    {% endif %}
+                </div>
+
+                <!-- Championship -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Championship</div>
+                    {% set slot = 'championship' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state) }}
+                    {% endif %}
+                </div>
+
+                <!-- F4 Game 2: Midwest vs South -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Final Four</div>
+                    {% set slot = 'f4_2' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state, 'TBD (MW/South)') }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// === DATA FROM SERVER ===
+const RESULTS = {{ state.results | tojson }};
+const LIVE_DATA = {{ state.live | tojson }};
+const TEAMS = {{ state.teams | tojson }};
+const ALL_PICKS = {{ all_picks | tojson }};
+const BOARD = {{ board | tojson }};
+const CURRENT_USER_ID = {{ user.id }};
+const ROUNDS = {{ rounds | tojson }};
+const USERS = {{ users | tojson(indent=None) }};
+
+// === TOGGLE LOGIC ===
+let activeMode = 'off';
+
+document.querySelectorAll('.master-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.master-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeMode = btn.dataset.mode;
+        applyOverlay(activeMode);
+    });
+});
+
+function applyOverlay(mode) {
+    // Clear all overlays first
+    clearOverlays();
+
+    const summaryEl = document.getElementById('master-summary');
+    const controlsEl = document.getElementById('overlay-controls');
+    summaryEl.textContent = '';
+    controlsEl.style.display = 'none';
+    controlsEl.innerHTML = '';
+
+    if (mode === 'off') return;
+    if (mode === 'picks') applyMyPicks();
+    if (mode === 'leverage') applyLeverage();
+    if (mode === 'vs') applyVsPlayer();
+    if (mode === 'whatif') applyWhatIf();
+}
+
+function clearOverlays() {
+    document.querySelectorAll('.master-team').forEach(el => {
+        el.classList.remove('overlay-correct', 'overlay-wrong', 'overlay-pending',
+                           'overlay-match', 'overlay-swing', 'overlay-gained', 'overlay-lost',
+                           'lev-high', 'lev-med', 'lev-low',
+                           'whatif-sim', 'whatif-simwin');
+        const ann = el.querySelector('.overlay-ann');
+        if (ann) ann.remove();
+        const pts = el.querySelector('.overlay-pts');
+        if (pts) pts.remove();
+    });
+}
+
+// === HELPER: get round info for a slot ===
+function getRoundForSlot(slot) {
+    if (slot.startsWith('ff_')) return 'ff';
+    if (slot === 'championship') return 'championship';
+    if (slot.startsWith('f4_')) return 'f4';
+    const parts = slot.split('_');
+    // e.g. east_r64_1 -> r64, east_r32_1 -> r32
+    return parts[1]; // r64, r32, s16, e8
+}
+
+function getRoundPoints(slot) {
+    const rk = getRoundForSlot(slot);
+    return ROUNDS[rk] ? ROUNDS[rk].points : 0;
+}
+
+function calcUpsetBonus(seed1, seed2) {
+    const hi = Math.min(seed1, seed2);
+    const lo = Math.max(seed1, seed2);
+    if (hi === 0) return 0;
+    return Math.round(lo / hi);
+}
+
+// === MY PICKS OVERLAY ===
+function applyMyPicks() {
+    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    let totalPts = 0;
+    let correctCount = 0;
+
+    // For each game on the master bracket, check if user has a pick
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        const pickTeamId = myPicks[slot];
+        if (!pickTeamId) return;
+
+        const result = RESULTS[slot];
+        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+
+        teamEls.forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (tid !== pickTeamId) return;
+
+            if (result && result.winner_id) {
+                // Game completed
+                if (result.winner_id === pickTeamId) {
+                    // Correct pick
+                    el.classList.add('overlay-correct');
+                    const rp = getRoundPoints(slot);
+                    const bonus = calcUpsetBonus(result.team1_id ? getSeed(result.team1_id) : 0,
+                                                  result.team2_id ? getSeed(result.team2_id) : 0);
+                    const pts = rp + bonus;
+                    totalPts += pts;
+                    correctCount++;
+                    const ptsEl = document.createElement('span');
+                    ptsEl.className = 'overlay-pts';
+                    ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
+                    el.appendChild(ptsEl);
+                } else {
+                    // Wrong pick
+                    el.classList.add('overlay-wrong');
+                }
+            } else {
+                // Game not yet played - pending pick
+                el.classList.add('overlay-pending');
+            }
+        });
+    });
+
+    // Find user rank from board
+    const myEntry = BOARD.find(e => e.user_id === CURRENT_USER_ID);
+    const rank = myEntry ? myEntry.rank : '-';
+    const total = myEntry ? myEntry.total : totalPts;
+    const summaryEl = document.getElementById('master-summary');
+    summaryEl.innerHTML = `You: <strong>${total} pts</strong> | Rank: <strong>${rank}</strong> of ${BOARD.length} | ${correctCount} correct`;
+}
+
+function getSeed(teamId) {
+    const t = TEAMS[teamId];
+    return t ? t.seed : 0;
+}
+
+// === LEVERAGE OVERLAY ===
+function applyLeverage() {
+    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const playerIds = Object.keys(ALL_PICKS).map(Number);
+    const totalPlayers = playerIds.length;
+    const leverageGames = [];
+
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        const rk = getRoundForSlot(slot);
+        if (rk === 'ff') return;
+
+        const result = RESULTS[slot];
+        const myPick = myPicks[slot];
+        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+        const roundPts = getRoundPoints(slot);
+
+        if (result && result.winner_id) {
+            // Completed game: show actual points gained vs field
+            if (!myPick) return;
+            const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
+            const iCorrect = myPick === result.winner_id;
+            const bonus = calcUpsetBonus(getSeed(result.team1_id), getSeed(result.team2_id));
+            const pts = roundPts + bonus;
+
+            teamEls.forEach(el => {
+                const tid = parseInt(el.dataset.teamId);
+                if (tid !== result.winner_id) return;
+                if (iCorrect) {
+                    // I got it right, show how many others missed
+                    const othersWrong = totalPlayers - samePickCount;
+                    if (othersWrong > 0) {
+                        el.classList.add('overlay-correct');
+                        addAnnotation(el, `+${pts} pts, ${othersWrong} missed`);
+                    }
+                } else {
+                    // I got it wrong
+                    const othersRight = samePickCount;
+                    if (othersRight > 0) {
+                        el.classList.add('overlay-wrong');
+                        addAnnotation(el, `-${pts} pts, ${othersRight} gained`);
+                    }
+                }
+            });
+        } else {
+            // Upcoming game: calculate leverage
+            if (!myPick) return;
+            // Count how many picked the same team for this slot
+            const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
+            // Get seeds for upset bonus calc
+            let seed1 = 0, seed2 = 0;
+            teamEls.forEach(el => {
+                const s = parseInt(el.dataset.seed) || 0;
+                const tid = parseInt(el.dataset.teamId);
+                if (tid) { if (!seed1) seed1 = s; else seed2 = s; }
+            });
+            const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+            const ptsAtStake = roundPts + bonus;
+            const leverage = ptsAtStake * (1 - samePickCount / totalPlayers);
+
+            // Color the picked team
+            teamEls.forEach(el => {
+                const tid = parseInt(el.dataset.teamId);
+                if (tid !== myPick) return;
+                if (leverage >= ptsAtStake * 0.5) {
+                    el.classList.add('lev-high');
+                } else if (leverage >= ptsAtStake * 0.2) {
+                    el.classList.add('lev-med');
+                } else {
+                    el.classList.add('lev-low');
+                }
+                addAnnotation(el, `${samePickCount}/${totalPlayers} agree | ${ptsAtStake} pts | Lev: ${leverage.toFixed(1)}`);
+            });
+
+            if (leverage > 0) {
+                const pickName = TEAMS[myPick]?.name || '?';
+                leverageGames.push({ slot, name: pickName, leverage, ptsAtStake, agree: samePickCount });
+            }
+        }
+    });
+
+    // Summary: top leverage games
+    leverageGames.sort((a, b) => b.leverage - a.leverage);
+    const top3 = leverageGames.slice(0, 3);
+    const summaryEl = document.getElementById('master-summary');
+    if (top3.length > 0) {
+        summaryEl.innerHTML = 'Top leverage: ' +
+            top3.map(g => `<strong>${g.name}</strong> (${g.leverage.toFixed(1)})`).join(', ');
+    } else {
+        summaryEl.textContent = 'No upcoming leverage games';
+    }
+}
+
+function addAnnotation(el, text) {
+    const ann = document.createElement('span');
+    ann.className = 'overlay-ann';
+    ann.textContent = text;
+    el.appendChild(ann);
+}
+
+// === VS PLAYER OVERLAY ===
+function applyVsPlayer() {
+    const controlsEl = document.getElementById('overlay-controls');
+    controlsEl.style.display = 'block';
+
+    // Build player dropdown
+    const otherUsers = USERS.filter(u => u.id !== CURRENT_USER_ID);
+    let html = '<label style="margin-right: 8px;">Compare with:</label><select id="vs-player-select">';
+    html += '<option value="">-- Select --</option>';
+    otherUsers.forEach(u => {
+        html += `<option value="${u.id}">${u.name}</option>`;
+    });
+    html += '</select>';
+    controlsEl.innerHTML = html;
+
+    document.getElementById('vs-player-select').addEventListener('change', (e) => {
+        clearOverlays();
+        const opponentId = parseInt(e.target.value);
+        if (opponentId) renderVsPlayer(opponentId);
+    });
+}
+
+function renderVsPlayer(opponentId) {
+    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const theirPicks = ALL_PICKS[opponentId] || {};
+    const opponentName = USERS.find(u => u.id === opponentId)?.name || '?';
+    let swingGames = 0;
+    let maxSwingPts = 0;
+
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        const rk = getRoundForSlot(slot);
+        if (rk === 'ff') return;
+
+        const myPick = myPicks[slot];
+        const theirPick = theirPicks[slot];
+        if (!myPick && !theirPick) return;
+
+        const result = RESULTS[slot];
+        const roundPts = getRoundPoints(slot);
+        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+        const samePick = myPick === theirPick;
+
+        if (samePick) {
+            // Same pick — dim these games
+            teamEls.forEach(el => {
+                if (parseInt(el.dataset.teamId) === myPick) {
+                    el.classList.add('overlay-match');
+                }
+            });
+        } else {
+            // Different picks
+            if (result && result.winner_id) {
+                // Completed: who was right?
+                const seed1 = getSeed(result.team1_id);
+                const seed2 = getSeed(result.team2_id);
+                const bonus = calcUpsetBonus(seed1, seed2);
+                const pts = roundPts + bonus;
+
+                teamEls.forEach(el => {
+                    const tid = parseInt(el.dataset.teamId);
+                    if (tid === myPick) {
+                        if (myPick === result.winner_id) {
+                            el.classList.add('overlay-gained');
+                            addAnnotation(el, `+${pts} on ${opponentName}`);
+                        } else {
+                            el.classList.add('overlay-lost');
+                        }
+                    }
+                    if (tid === theirPick) {
+                        if (theirPick === result.winner_id) {
+                            el.classList.add('overlay-lost');
+                            addAnnotation(el, `${opponentName} +${pts}`);
+                        } else {
+                            el.classList.add('overlay-gained');
+                        }
+                    }
+                });
+            } else {
+                // Upcoming: swing game
+                let seed1 = 0, seed2 = 0;
+                teamEls.forEach(el => {
+                    const s = parseInt(el.dataset.seed) || 0;
+                    if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
+                });
+                const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+                const pts = roundPts + bonus;
+                swingGames++;
+                maxSwingPts += pts;
+
+                teamEls.forEach(el => {
+                    const tid = parseInt(el.dataset.teamId);
+                    if (tid === myPick) {
+                        el.classList.add('overlay-swing');
+                        addAnnotation(el, `You`);
+                    } else if (tid === theirPick) {
+                        el.classList.add('overlay-swing');
+                        addAnnotation(el, opponentName);
+                    }
+                });
+            }
+        }
+    });
+
+    // Summary
+    const myEntry = BOARD.find(e => e.user_id === CURRENT_USER_ID);
+    const theirEntry = BOARD.find(e => e.user_id === opponentId);
+    const myTotal = myEntry?.total || 0;
+    const theirTotal = theirEntry?.total || 0;
+    const diff = myTotal - theirTotal;
+    const diffStr = diff > 0 ? `${diff} pts ahead` : diff < 0 ? `${Math.abs(diff)} pts back` : 'tied';
+    document.getElementById('master-summary').innerHTML =
+        `You: <strong>${myTotal}</strong> | ${opponentName}: <strong>${theirTotal}</strong> | ${diffStr} | <strong>${swingGames}</strong> swing games (up to ${maxSwingPts} pts)`;
+}
+
+// === WHAT IF OVERLAY ===
+const simResults = {}; // slot -> winner_team_id
+
+function applyWhatIf() {
+    const controlsEl = document.getElementById('overlay-controls');
+    controlsEl.style.display = 'block';
+    controlsEl.innerHTML = '<button id="whatif-clear" style="font-size: 11px; padding: 4px 10px;">Clear All Simulations</button> <span style="font-size: 11px; color: var(--text-dim);">Click a team in any upcoming game to simulate that outcome.</span>';
+    document.getElementById('whatif-clear').addEventListener('click', () => {
+        Object.keys(simResults).forEach(k => delete simResults[k]);
+        clearOverlays();
+        renderWhatIf();
+    });
+
+    // Make upcoming games clickable
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        const result = RESULTS[slot];
+        if (result && result.winner_id) return; // completed, skip
+
+        gameEl.querySelectorAll('.master-team[data-team-id]').forEach(el => {
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', whatIfClickHandler);
+        });
+    });
+
+    renderWhatIf();
+}
+
+function whatIfClickHandler(e) {
+    if (activeMode !== 'whatif') return;
+    const el = e.currentTarget;
+    const slot = el.dataset.slot;
+    const teamId = parseInt(el.dataset.teamId);
+    if (!slot || !teamId) return;
+
+    // Toggle: click same team to undo
+    if (simResults[slot] === teamId) {
+        delete simResults[slot];
+    } else {
+        simResults[slot] = teamId;
+    }
+    clearOverlays();
+    renderWhatIf();
+}
+
+function renderWhatIf() {
+    // Calculate simulated leaderboard
+    const simBoard = calcSimulatedBoard();
+
+    // Highlight simulated games
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        const simWinner = simResults[slot];
+        if (!simWinner) return;
+
+        gameEl.querySelectorAll('.master-team[data-team-id]').forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (tid === simWinner) {
+                el.classList.add('whatif-simwin');
+            } else {
+                el.classList.add('whatif-sim');
+            }
+        });
+    });
+
+    // Show mini-leaderboard in summary
+    const summaryEl = document.getElementById('master-summary');
+    const simCount = Object.keys(simResults).length;
+    if (simCount === 0) {
+        summaryEl.textContent = 'Click teams to simulate outcomes';
+        return;
+    }
+
+    // Build mini leaderboard
+    let html = `<span style="color: var(--text-dim);">${simCount} simulated | </span>`;
+    simBoard.slice(0, 6).forEach(entry => {
+        const isMe = entry.user_id === CURRENT_USER_ID;
+        const style = isMe ? 'color: var(--accent); font-weight: 700;' : '';
+        const rankChange = entry.rank - entry.actualRank;
+        const arrow = rankChange < 0 ? `<span style="color:var(--green);">&uarr;${Math.abs(rankChange)}</span>` :
+                       rankChange > 0 ? `<span style="color:var(--red);">&darr;${rankChange}</span>` : '';
+        html += `<span style="${style}">${entry.rank}. ${entry.name} ${entry.simTotal}pts ${arrow}</span> `;
+    });
+    summaryEl.innerHTML = html;
+}
+
+function calcSimulatedBoard() {
+    // Start from actual board scores, add points for simulated results
+    const simScores = {};
+    BOARD.forEach(entry => {
+        simScores[entry.user_id] = {
+            user_id: entry.user_id,
+            name: entry.name,
+            actualTotal: entry.total,
+            actualRank: entry.rank,
+            simTotal: entry.total,
+        };
+    });
+
+    // For each simulated result, check every player's pick
+    for (const [slot, winnerId] of Object.entries(simResults)) {
+        const roundPts = getRoundPoints(slot);
+        if (roundPts === 0) continue;
+
+        // Get seeds of teams in this game for upset bonus
+        const gameEl = document.getElementById('mgame-' + slot);
+        if (!gameEl) continue;
+        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+        let seed1 = 0, seed2 = 0;
+        teamEls.forEach(el => {
+            const s = parseInt(el.dataset.seed) || 0;
+            if (!seed1) seed1 = s; else seed2 = s;
+        });
+        const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+        const pts = roundPts + bonus;
+
+        // Credit each player who picked this winner
+        for (const [uid, picks] of Object.entries(ALL_PICKS)) {
+            if (picks[slot] === winnerId) {
+                if (simScores[uid]) simScores[uid].simTotal += pts;
+            }
+        }
+    }
+
+    // Sort and rank
+    const board = Object.values(simScores);
+    board.sort((a, b) => b.simTotal - a.simTotal);
+    for (let i = 0; i < board.length; i++) {
+        if (i > 0 && board[i].simTotal === board[i-1].simTotal) {
+            board[i].rank = board[i-1].rank;
+        } else {
+            board[i].rank = i + 1;
+        }
+    }
+    return board;
+}
+</script>
+{% endblock %}

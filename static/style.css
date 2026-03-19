@@ -623,6 +623,160 @@ button:disabled {
     font-weight: 400;
 }
 
+/* Master Bracket */
+.master-toggle-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 8px 0;
+}
+.master-toggles {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.master-toggle {
+    padding: 6px 14px;
+    font-size: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.master-toggle:hover { background: var(--bg-hover); color: var(--text); }
+.master-toggle.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text-bright);
+}
+.master-summary {
+    font-size: 13px;
+    color: var(--text-dim);
+    flex: 1;
+    text-align: right;
+}
+.overlay-controls {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* Master game team states */
+.master-team { cursor: default; }
+.master-winner {
+    background: rgba(76, 175, 80, 0.15);
+    border-left: 3px solid var(--green);
+    font-weight: 600;
+}
+.master-winner .name { color: var(--text-bright); }
+.master-loser {
+    opacity: 0.45;
+    text-decoration: line-through;
+}
+.master-tbd { opacity: 0.3; }
+
+/* Overlay classes (used by toggles) */
+.overlay-correct {
+    background: rgba(76, 175, 80, 0.2) !important;
+    border-left: 3px solid var(--green) !important;
+    opacity: 1 !important;
+}
+.overlay-wrong {
+    background: rgba(229, 57, 53, 0.2) !important;
+    border-left: 3px solid var(--red) !important;
+    opacity: 1 !important;
+    text-decoration: line-through;
+}
+.overlay-pending {
+    background: rgba(74, 158, 255, 0.12) !important;
+    border-left: 3px solid var(--accent) !important;
+    opacity: 1 !important;
+}
+.overlay-pts {
+    font-size: 10px;
+    color: var(--green);
+    margin-left: 4px;
+    white-space: nowrap;
+}
+.overlay-ann {
+    display: none;
+}
+/* Show annotation as tooltip on hover */
+.master-team {
+    position: relative;
+}
+.master-team:hover .overlay-ann {
+    display: block;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: #222;
+    border: 1px solid var(--border);
+    padding: 4px 6px;
+    font-size: 10px;
+    color: var(--text);
+    white-space: nowrap;
+    z-index: 10;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+/* Leverage classes */
+.lev-high {
+    background: rgba(76, 175, 80, 0.25) !important;
+    border-left: 3px solid var(--green) !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+    opacity: 1 !important;
+}
+.lev-med {
+    background: rgba(255, 179, 0, 0.15) !important;
+    border-left: 3px solid var(--yellow) !important;
+    opacity: 1 !important;
+}
+.lev-low {
+    opacity: 0.5 !important;
+    border-left: 3px solid var(--border) !important;
+}
+
+/* vs Player classes */
+.overlay-match { opacity: 0.35 !important; }
+.overlay-swing {
+    background: rgba(255, 179, 0, 0.2) !important;
+    border-left: 3px solid var(--yellow) !important;
+    opacity: 1 !important;
+}
+.overlay-gained {
+    background: rgba(76, 175, 80, 0.2) !important;
+    border-left: 3px solid var(--green) !important;
+    opacity: 1 !important;
+}
+.overlay-lost {
+    background: rgba(229, 57, 53, 0.15) !important;
+    border-left: 3px solid var(--red) !important;
+    opacity: 1 !important;
+}
+
+/* What If classes */
+.whatif-simwin {
+    background: rgba(74, 158, 255, 0.2) !important;
+    border-left: 3px solid var(--accent) !important;
+    border-style: dashed !important;
+    opacity: 1 !important;
+    font-weight: 600;
+}
+.whatif-sim {
+    opacity: 0.3 !important;
+    text-decoration: line-through;
+}
+
 /* Clear pick button */
 
 .clear-pick {

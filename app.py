@@ -302,6 +302,34 @@ def bracket():
     )
 
 
+@app.route("/master")
+@login_required
+def master_bracket():
+    user = get_current_user()
+    state = build_bracket_state()  # No user_id = ground truth only
+    # Get all users' picks for overlay calculations
+    users = User.query.all()
+    all_picks = {}
+    for u in users:
+        all_picks[u.id] = {
+            p.game_slot: p.picked_team_id
+            for p in Pick.query.filter_by(user_id=u.id).all()
+        }
+    board = calculate_leaderboard()
+    users_list = [{"id": u.id, "name": u.name} for u in users]
+    return render_template(
+        "master.html",
+        user=user,
+        state=state,
+        all_picks=all_picks,
+        board=board,
+        users=users_list,
+        regions=REGIONS,
+        rounds=ROUNDS,
+        now=now_et(),
+    )
+
+
 @app.route("/bracket/save", methods=["POST"])
 def save_picks():
     data = request.get_json()
