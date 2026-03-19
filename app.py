@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 ET = timezone(timedelta(hours=-4))  # EDT
 
 # Phase deadlines
-PHASE1_LOCK = datetime(2026, 3, 19, 12, 0, 0, tzinfo=ET)
+PHASE1_LOCK = datetime(2026, 3, 19, 12, 15, 0, tzinfo=ET)
 PHASE2_UNLOCK = datetime(2026, 3, 23, 4, 20, 0, tzinfo=ET)
 PHASE2_LOCK = datetime(2026, 3, 26, 12, 0, 0, tzinfo=ET)
 
@@ -303,25 +303,42 @@ def bracket():
 
 
 @app.route("/bracket/save", methods=["POST"])
-@login_required
 def save_picks():
-    user = get_current_user()
     data = request.get_json()
 
     if not data or "picks" not in data:
         return jsonify({"error": "No picks provided"}), 400
 
+    # Admin edit mode: bypass phase locks, save for target user
+    is_admin_edit = data.get("admin_edit", False)
+    if is_admin_edit:
+        if not require_admin():
+            return jsonify({"error": "Admin authentication required"}), 403
+        target_user_id = data.get("target_user_id")
+        if not target_user_id:
+            return jsonify({"error": "No target user specified"}), 400
+        user = User.query.get(target_user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+    else:
+        if "user_id" not in session:
+            return jsonify({"error": "Not logged in"}), 401
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Not logged in"}), 401
+
     picks_data = data["picks"]
     phase = data.get("phase", 1)
 
-    # Validate phase timing
-    if phase == 1 and not phase1_open():
-        return jsonify({"error": "Phase 1 is locked"}), 400
-    if phase == 2 and not phase2_open():
-        return jsonify({"error": "Phase 2 is not open"}), 400
+    # Validate phase timing (skip for admin edits)
+    if not is_admin_edit:
+        if phase == 1 and not phase1_open():
+            return jsonify({"error": "Phase 1 is locked"}), 400
+        if phase == 2 and not phase2_open():
+            return jsonify({"error": "Phase 2 is not open"}), 400
 
-    # Validate phase 2 picks are alive teams
-    if phase == 2:
+    # Validate phase 2 picks are alive teams (skip for admin edits)
+    if phase == 2 and not is_admin_edit:
         alive = get_alive_teams()
         for slot, team_id in picks_data.items():
             if get_phase_for_slot(slot) == 2 and team_id not in alive:
@@ -412,6 +429,66 @@ def leaderboard():
 
 
 # --- Admin ---
+
+
+def require_admin():
+    """Check admin password from session. Returns True if valid, or a 401 response."""
+    pw = session.get("admin_pw")
+    if pw != ADMIN_PASSWORD:
+        return False
+    return True
+
+
+@app.route("/admin/bracket/<int:user_id>")
+def admin_bracket_view(user_id):
+    if not require_admin():
+        return render_template("admin_login.html"), 401
+    target = User.query.get_or_404(user_id)
+    state = build_bracket_state(target.id)
+    alive_teams = get_alive_teams()
+    return render_template(
+        "bracket.html",
+        user=target,
+        state=state,
+        phase1_open=False,
+        phase2_open=False,
+        phase1_lock=PHASE1_LOCK,
+        phase2_unlock=PHASE2_UNLOCK,
+        phase2_lock=PHASE2_LOCK,
+        alive_team_ids=list(alive_teams.keys()),
+        regions=REGIONS,
+        rounds=ROUNDS,
+        now=now_et(),
+        admin_view=True,
+        admin_user_name=target.name,
+    )
+
+
+@app.route("/admin/bracket/<int:user_id>/edit")
+def admin_bracket_edit(user_id):
+    if not require_admin():
+        return render_template("admin_login.html"), 401
+    target = User.query.get_or_404(user_id)
+    state = build_bracket_state(target.id)
+    alive_teams = get_alive_teams()
+    return render_template(
+        "bracket.html",
+        user=target,
+        state=state,
+        phase1_open=True,
+        phase2_open=True,
+        phase1_lock=PHASE1_LOCK,
+        phase2_unlock=PHASE2_UNLOCK,
+        phase2_lock=PHASE2_LOCK,
+        alive_team_ids=list(alive_teams.keys()),
+        regions=REGIONS,
+        rounds=ROUNDS,
+        now=now_et(),
+        admin_edit=True,
+        target_user_id=target.id,
+        admin_user_name=target.name,
+    )
+
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():

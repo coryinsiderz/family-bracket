@@ -600,6 +600,29 @@ button:disabled {
 }
 .paste-dropdown:focus { outline: 1px solid var(--accent); }
 
+/* Admin bracket banner */
+.admin-banner {
+    background: #1a1a3e;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.admin-banner-edit {
+    border-color: var(--yellow);
+    color: var(--yellow);
+}
+.admin-back-link {
+    font-size: 12px;
+    font-weight: 400;
+}
+
 /* Clear pick button */
 
 .clear-pick {

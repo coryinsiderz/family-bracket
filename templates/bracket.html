@@ -3,6 +3,17 @@
 
 {% block content %}
 <div class="container">
+    {% if admin_view is defined and admin_view %}
+    <div class="admin-banner">
+        Viewing {{ admin_user_name }}'s Bracket (read-only)
+        <a href="{{ url_for('admin') }}" class="admin-back-link">&larr; Back to Admin</a>
+    </div>
+    {% elif admin_edit is defined and admin_edit %}
+    <div class="admin-banner admin-banner-edit">
+        Editing {{ admin_user_name }}'s Bracket
+        <a href="{{ url_for('admin') }}" class="admin-back-link">&larr; Back to Admin</a>
+    </div>
+    {% endif %}
     <!-- Phase status bar -->
     <div class="phase-bar">
         <div>
@@ -490,6 +501,7 @@
 </div>
 
 <!-- Save bar -->
+{% if not (admin_view is defined and admin_view) %}
 <div class="save-bar" id="save-bar" style="display: none;">
     <span class="status" id="save-status">
         {% if user.submitted %}
@@ -497,7 +509,12 @@
         {% endif %}
     </span>
     <div class="flex gap-8">
-        {% if phase1_open or phase2_open %}
+        {% if admin_edit is defined and admin_edit %}
+        <button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>
+        <button onclick="showPasteModal()">Paste Bracket</button>
+        <button onclick="savePicks(1)" id="save-phase1-btn">Save Bracket</button>
+        <button onclick="savePicks(2)" id="save-phase2-btn">Save Rest of the Way</button>
+        {% elif phase1_open or phase2_open %}
         <button class="btn-danger" onclick="showClearConfirm()">Clear Bracket</button>
         {% if phase1_open %}
         <button onclick="showPasteModal()">Paste Bracket</button>
@@ -509,6 +526,7 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
 {% endblock %}
 
@@ -521,6 +539,9 @@ const RESULTS = {{ state.results | tojson }};
 const LIVE_DATA = {{ state.live | tojson }};
 const TEAMS_DATA = {{ state.teams | tojson }};
 let IS_SUBMITTED = {{ 'true' if user.submitted else 'false' }};
+const ADMIN_EDIT = {{ 'true' if admin_edit is defined and admin_edit else 'false' }};
+const ADMIN_VIEW = {{ 'true' if admin_view is defined and admin_view else 'false' }};
+const TARGET_USER_ID = {{ target_user_id if target_user_id is defined and target_user_id else 'null' }};
 
 // Bracket progression: parent_slot -> [child1_slot, child2_slot]
 const PROGRESSION = {};
@@ -901,10 +922,15 @@ async function savePicks(phase, skipModal) {
     }
 
     try {
+        const payload = { picks: toSave, phase: phase };
+        if (ADMIN_EDIT) {
+            payload.admin_edit = true;
+            payload.target_user_id = TARGET_USER_ID;
+        }
         const resp = await fetch('/bracket/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ picks: toSave, phase: phase }),
+            body: JSON.stringify(payload),
         });
 
         const data = await resp.json();
@@ -956,8 +982,10 @@ document.querySelectorAll('.game-team:not(.locked)').forEach(function(el) {
 });
 
 // Show save bar if there are existing picks (for Clear Bracket access)
-if (Object.keys(picks).length > 0 && (PHASE1_OPEN || PHASE2_OPEN)) {
-    document.getElementById('save-bar').style.display = 'flex';
+// Always show in admin edit mode
+if (ADMIN_EDIT || (Object.keys(picks).length > 0 && (PHASE1_OPEN || PHASE2_OPEN))) {
+    const bar = document.getElementById('save-bar');
+    if (bar) bar.style.display = 'flex';
 }
 
 // Countdown timers
