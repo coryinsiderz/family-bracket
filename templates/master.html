@@ -52,6 +52,7 @@
             <button class="master-toggle" data-mode="leverage">Leverage</button>
             <button class="master-toggle" data-mode="vs">vs Player</button>
             <button class="master-toggle" data-mode="whatif">What If</button>
+            <button class="master-toggle" data-mode="exposure">Exposure</button>
         </div>
         <div id="master-summary" class="master-summary"></div>
     </div>
@@ -260,7 +261,16 @@ function applyOverlay(mode) {
     controlsEl.style.display = 'none';
     controlsEl.innerHTML = '';
 
-    if (mode === 'off') return;
+    if (mode === 'off') {
+        document.getElementById('master-bracket-wrapper').style.display = '';
+        return;
+    }
+    if (mode === 'exposure') {
+        document.getElementById('master-bracket-wrapper').style.display = 'none';
+        applyExposure();
+        return;
+    }
+    document.getElementById('master-bracket-wrapper').style.display = '';
     if (mode === 'picks') applyMyPicks();
     if (mode === 'leverage') applyLeverage();
     if (mode === 'vs') applyVsPlayer();
@@ -278,6 +288,56 @@ function clearOverlays() {
         const pts = el.querySelector('.overlay-pts');
         if (pts) pts.remove();
     });
+    // Remove injected projected picks
+    document.querySelectorAll('.master-projected').forEach(el => el.remove());
+    // Restore hidden TBD elements
+    document.querySelectorAll('.master-tbd-hidden').forEach(el => {
+        el.classList.remove('master-tbd-hidden');
+        el.style.display = '';
+    });
+}
+
+// Inject projected picks from a user into TBD slots on the bracket
+function injectProjectedPicks(userId) {
+    const picks = ALL_PICKS[userId] || {};
+    for (const [slot, teamId] of Object.entries(picks)) {
+        const rk = getRoundForSlot(slot);
+        if (rk === 'ff' || rk === 'r64') continue; // R64 teams already rendered
+
+        const gameEl = document.getElementById('mgame-' + slot);
+        if (!gameEl) continue;
+
+        // Check if this team is already shown in the game (from results)
+        const existing = gameEl.querySelector(`.master-team[data-team-id="${teamId}"]`);
+        if (existing) continue;
+
+        const team = TEAMS[teamId];
+        if (!team) continue;
+
+        // Find a TBD slot to replace
+        const feeders = PROGRESSION[slot];
+        if (!feeders) continue;
+
+        const tbdEls = gameEl.querySelectorAll('.master-tbd');
+        // Determine which TBD to replace based on feeder position
+        // Check which feeder the user's pick comes from
+        for (let i = 0; i < tbdEls.length; i++) {
+            const tbd = tbdEls[i];
+            if (tbd.classList.contains('master-tbd-hidden')) continue;
+            // Replace first available TBD with projected team
+            tbd.classList.add('master-tbd-hidden');
+            tbd.style.display = 'none';
+            const proj = document.createElement('div');
+            proj.className = 'game-team master-team master-projected overlay-pending';
+            proj.dataset.slot = slot;
+            proj.dataset.teamId = teamId;
+            proj.dataset.seed = team.seed;
+            proj.dataset.name = team.name;
+            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
+            tbd.parentNode.insertBefore(proj, tbd);
+            break;
+        }
+    }
 }
 
 // === HELPER: get round info for a slot ===
@@ -308,10 +368,13 @@ function applyMyPicks() {
     let totalPts = 0;
     let correctCount = 0;
 
+    // Inject projected picks into later rounds
+    injectProjectedPicks(CURRENT_USER_ID);
+
     // For each game on the master bracket, check if user has a pick
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
-        const pickTeamId = myPicks[slot];
+        const pickTeamId = getUserPickForSlot(CURRENT_USER_ID, slot);
         if (!pickTeamId) return;
 
         const result = RESULTS[slot];
@@ -362,6 +425,9 @@ function getSeed(teamId) {
 
 // === LEVERAGE OVERLAY ===
 function applyLeverage() {
+    // Inject projected picks so user sees their bracket path
+    injectProjectedPicks(CURRENT_USER_ID);
+
     const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
@@ -809,6 +875,87 @@ function calcSimulatedBoard() {
         }
     }
     return board;
+}
+
+// === EXPOSURE OVERLAY ===
+function applyExposure() {
+    const playerIds = Object.keys(ALL_PICKS).map(Number);
+    const totalPlayers = playerIds.length;
+    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+
+    // Round display order
+    const roundOrder = [
+        { key: 'r64', label: 'R64 Winners', slotPattern: '_r64_' },
+        { key: 'r32', label: 'R32 Winners', slotPattern: '_r32_' },
+        { key: 's16', label: 'Sweet 16', slotPattern: '_s16_' },
+        { key: 'e8', label: 'Elite 8', slotPattern: '_e8_' },
+        { key: 'f4', label: 'Final Four', slotPattern: 'f4_' },
+        { key: 'championship', label: 'Champion', slotPattern: 'championship' },
+    ];
+
+    const controlsEl = document.getElementById('overlay-controls');
+    controlsEl.style.display = 'block';
+
+    let html = '';
+    for (const round of roundOrder) {
+        // Find all slots for this round
+        const slots = [];
+        for (const [uid, picks] of Object.entries(ALL_PICKS)) {
+            for (const slot of Object.keys(picks)) {
+                if (round.key === 'championship') {
+                    if (slot === 'championship' && !slots.includes(slot)) slots.push(slot);
+                } else if (round.key === 'f4') {
+                    if (slot.startsWith('f4_') && !slots.includes(slot)) slots.push(slot);
+                } else {
+                    if (slot.includes(round.slotPattern) && !slots.includes(slot)) slots.push(slot);
+                }
+            }
+        }
+
+        // Count picks per team across all slots in this round
+        const teamCounts = {};
+        for (const pid of playerIds) {
+            const picks = ALL_PICKS[pid] || {};
+            for (const slot of slots) {
+                const teamId = picks[slot];
+                if (!teamId) continue;
+                if (!teamCounts[teamId]) teamCounts[teamId] = { count: 0, name: TEAMS[teamId]?.name || '?', seed: TEAMS[teamId]?.seed || 0 };
+                teamCounts[teamId].count++;
+            }
+        }
+
+        // Sort by count descending
+        const sorted = Object.entries(teamCounts)
+            .map(([tid, data]) => ({ teamId: parseInt(tid), ...data }))
+            .sort((a, b) => b.count - a.count || a.seed - b.seed);
+
+        if (sorted.length === 0) continue;
+
+        // Check which teams current user picked in this round
+        const myTeamsThisRound = new Set();
+        for (const slot of slots) {
+            if (myPicks[slot]) myTeamsThisRound.add(myPicks[slot]);
+        }
+
+        html += `<div class="exposure-round">`;
+        html += `<div class="exposure-round-header" onclick="this.parentNode.classList.toggle('collapsed')">${round.label}</div>`;
+        html += `<div class="exposure-round-body">`;
+        for (const entry of sorted) {
+            const pct = Math.round(entry.count / totalPlayers * 100);
+            const isMyPick = myTeamsThisRound.has(entry.teamId);
+            const cls = isMyPick ? 'exposure-row exposure-mine' : 'exposure-row';
+            const bar = Math.round(entry.count / totalPlayers * 100);
+            html += `<div class="${cls}">`;
+            html += `<span class="exposure-team">(${entry.seed}) ${entry.name}</span>`;
+            html += `<span class="exposure-bar"><span class="exposure-fill" style="width:${bar}%"></span></span>`;
+            html += `<span class="exposure-pct">${entry.count}/${totalPlayers} (${pct}%)</span>`;
+            html += `</div>`;
+        }
+        html += `</div></div>`;
+    }
+
+    controlsEl.innerHTML = html;
+    document.getElementById('master-summary').textContent = `Field exposure across ${totalPlayers} entries`;
 }
 </script>
 {% endblock %}

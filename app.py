@@ -646,7 +646,7 @@ def _seed_test_entries():
             if n1 and n2:
                 r64_games.append((slot, n1, s1, n2, s2))
 
-    # 8 profiles with varied chalk probability
+    # 8 test profiles + fill existing real users with complete brackets
     profiles = [
         ("Alice", 0.95),    # super chalk
         ("Bob", 0.80),      # mostly chalk
@@ -657,6 +657,12 @@ def _seed_test_entries():
         ("Grace", 0.70),    # balanced-chalk
         ("Hank", 0.55),     # near even
     ]
+
+    # Also fill existing real users who have incomplete brackets
+    existing_users = User.query.all()
+    for eu in existing_users:
+        if eu.name not in [p[0] for p in profiles]:
+            profiles.append((eu.name, 0.72))  # balanced-chalk for real users
 
     random.seed(42)
     count = 0

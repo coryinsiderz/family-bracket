@@ -809,6 +809,38 @@ button:disabled {
     .lev-modal { border-radius: 12px 12px 0 0; max-height: 70vh; }
 }
 
+/* Exposure table */
+.exposure-round { margin-bottom: 8px; }
+.exposure-round.collapsed .exposure-round-body { display: none; }
+.exposure-round-header {
+    font-weight: 700;
+    font-size: 13px;
+    padding: 6px 0;
+    cursor: pointer;
+    color: var(--text-bright);
+    border-bottom: 1px solid var(--border);
+}
+.exposure-round-header:hover { color: var(--accent); }
+.exposure-round-body { padding: 4px 0; }
+.exposure-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px;
+    font-size: 12px;
+    border-radius: 3px;
+}
+.exposure-mine {
+    background: rgba(74, 158, 255, 0.1);
+    border-left: 2px solid var(--accent);
+    font-weight: 600;
+}
+.exposure-team { width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.exposure-bar { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; min-width: 60px; }
+.exposure-fill { display: block; height: 100%; background: var(--accent-dim); border-radius: 4px; }
+.exposure-pct { width: 80px; text-align: right; color: var(--text-dim); flex-shrink: 0; }
+.master-projected .name { font-style: italic; }
+
 /* What If classes */
 .whatif-simwin {
     background: rgba(74, 158, 255, 0.2) !important;
