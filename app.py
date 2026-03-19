@@ -551,6 +551,18 @@ def admin():
                 db.session.commit()
                 flash(f"{'Marked' if user.paid else 'Unmarked'} {user.name} as paid")
 
+        elif action == "create_user":
+            name = request.form.get("name", "").strip()
+            if not name:
+                flash("Name is required")
+            elif User.query.filter_by(name=name).first():
+                flash(f"User '{name}' already exists")
+            else:
+                new_user = User(name=name, password_hash="")
+                db.session.add(new_user)
+                db.session.commit()
+                flash(f"Created user '{name}'")
+
     teams = {t.id: t for t in Team.query.all()}
     results = {r.game_slot: r for r in GameResult.query.all()}
     users = User.query.all()

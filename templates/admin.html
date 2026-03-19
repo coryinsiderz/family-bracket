@@ -25,6 +25,20 @@
         </div>
     </div>
 
+    <!-- Create User -->
+    <div class="card mt-16">
+        <h2>Create User</h2>
+        <form method="POST" style="display: flex; gap: 8px; align-items: end;">
+            <input type="hidden" name="action" value="create_user">
+            <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+            <div>
+                <label>Name</label>
+                <input type="text" name="name" required placeholder="Enter name" style="width: 200px;">
+            </div>
+            <button type="submit">Create</button>
+        </form>
+    </div>
+
     <div class="admin-grid">
         <!-- Record Result -->
         <div class="card">
