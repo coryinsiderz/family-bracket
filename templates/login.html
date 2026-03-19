@@ -1,22 +1,64 @@
 {% extends "base.html" %}
-{% block title %}Log In - Bracket Pool{% endblock %}
+{% block title %}Welcome - Bracket Pool{% endblock %}
 
 {% block content %}
-<div class="container-narrow" style="margin-top: 80px;">
-    <div class="card">
-        <h1>Log In</h1>
+<div class="container-narrow" style="margin-top: 60px;">
+    <!-- Guest access -->
+    <div class="card" style="margin-bottom: 16px;">
+        <h2 style="margin-top: 0;">View Brackets</h2>
+        <p class="text-dim text-sm">Browse the leaderboard, master bracket, and all player picks.</p>
         <form method="POST">
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" autocomplete="username" required autofocus>
+            <input type="hidden" name="action" value="guest">
+            <button type="submit" style="width: 100%;">Continue as Guest</button>
+        </form>
+    </div>
 
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password" required>
+    <!-- Claim entry -->
+    {% if unclaimed %}
+    <div class="card" style="margin-bottom: 16px;">
+        <h2 style="margin-top: 0;">Claim Your Entry</h2>
+        <p class="text-dim text-sm">Choose your entry, pick a display name, and set a password.</p>
+        <form method="POST">
+            <input type="hidden" name="action" value="claim">
+
+            <label>Select your entry</label>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                {% for u in unclaimed %}
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">
+                    <input type="radio" name="user_id" value="{{ u.id }}" required style="margin: 0;">
+                    <span>{{ u.name }}</span>
+                    {% if u.submitted %}
+                    <span class="text-dim text-sm" style="margin-left: auto;">(bracket filled)</span>
+                    {% endif %}
+                </label>
+                {% endfor %}
+            </div>
+
+            <label for="claim-name">Your display name</label>
+            <input type="text" id="claim-name" name="name" autocomplete="username" required>
+
+            <label for="claim-password">Password</label>
+            <input type="password" id="claim-password" name="password" autocomplete="new-password" required minlength="4">
+
+            <button type="submit" style="width: 100%; margin-top: 8px;">Claim Entry</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Log in -->
+    <div class="card">
+        <h2 style="margin-top: 0;">Log In</h2>
+        <form method="POST">
+            <input type="hidden" name="action" value="login">
+
+            <label for="login-name">Name</label>
+            <input type="text" id="login-name" name="name" autocomplete="username" required>
+
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" name="password" autocomplete="current-password" required>
 
             <button type="submit" style="width: 100%; margin-top: 8px;">Log In</button>
         </form>
-        <p class="text-dim text-sm mt-16">
-            Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a>
-        </p>
     </div>
 </div>
 {% endblock %}

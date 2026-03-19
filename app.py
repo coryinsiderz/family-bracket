@@ -223,8 +223,8 @@ def build_bracket_state(user_id=None):
 
 # --- Auth Routes ---
 
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
+@app.route("/login", methods=["GET", "POST"])
+def login():
     if request.method == "POST":
         action = request.form.get("action")
 
@@ -240,22 +240,21 @@ def signup():
 
             if not user_id or not name or not password:
                 flash("All fields are required.")
-                return redirect(url_for("signup"))
+                return redirect(url_for("login"))
 
             if len(password) < 4:
                 flash("Password must be at least 4 characters.")
-                return redirect(url_for("signup"))
+                return redirect(url_for("login"))
 
             user = User.query.get(int(user_id))
             if not user or user.password_hash != "":
                 flash("That entry is no longer available.")
-                return redirect(url_for("signup"))
+                return redirect(url_for("login"))
 
-            # Check if chosen name conflicts with another user
             existing = User.query.filter(User.name == name, User.id != user.id).first()
             if existing:
                 flash(f"The name '{name}' is already taken.")
-                return redirect(url_for("signup"))
+                return redirect(url_for("login"))
 
             user.name = name
             user.set_password(password)
@@ -265,27 +264,21 @@ def signup():
             session.pop("guest", None)
             return redirect(url_for("bracket"))
 
-    # Get unclaimed accounts (admin-created with no password)
+        if action == "login":
+            name = request.form.get("name", "").strip().lower()
+            password = request.form.get("password", "")
+
+            user = User.query.filter(db.func.lower(User.name) == name).first()
+            if not user or user.password_hash == "" or not user.check_password(password):
+                flash("Invalid name or password.")
+                return redirect(url_for("login"))
+
+            session["user_id"] = user.id
+            session.pop("guest", None)
+            return redirect(url_for("bracket"))
+
     unclaimed = User.query.filter_by(password_hash="").all()
-    return render_template("signup.html", unclaimed=unclaimed)
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        name = request.form.get("name", "").strip().lower()
-        password = request.form.get("password", "")
-
-        user = User.query.filter(db.func.lower(User.name) == name).first()
-        if not user or user.password_hash == "" or not user.check_password(password):
-            flash("Invalid name or password.")
-            return render_template("login.html")
-
-        session["user_id"] = user.id
-        session.pop("guest", None)
-        return redirect(url_for("bracket"))
-
-    return render_template("login.html")
+    return render_template("login.html", unclaimed=unclaimed)
 
 
 @app.route("/logout")
