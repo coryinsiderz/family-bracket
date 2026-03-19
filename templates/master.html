@@ -297,39 +297,55 @@ function clearOverlays() {
     });
 }
 
-// Inject projected picks from a user into TBD slots on the bracket
+// Inject projected picks from a user into TBD slots on the bracket.
+// Builds the full projected bracket: R32 picks populate S16 matchups,
+// S16 picks populate E8, etc.
 function injectProjectedPicks(userId) {
     const picks = ALL_PICKS[userId] || {};
-    for (const [slot, teamId] of Object.entries(picks)) {
-        const rk = getRoundForSlot(slot);
-        if (rk === 'ff' || rk === 'r64') continue; // R64 teams already rendered
 
-        const gameEl = document.getElementById('mgame-' + slot);
-        if (!gameEl) continue;
+    // Process slots in round order so earlier projections feed later ones.
+    // For each slot with a pick, the winner should appear in the parent slot.
+    // Slot order: R32 -> S16 -> E8 -> F4 -> Championship
+    const slotOrder = [];
+    const regions = ['east', 'west', 'midwest', 'south'];
+    for (const r of regions) {
+        for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
+    }
+    for (const r of regions) {
+        for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
+    }
+    for (const r of regions) slotOrder.push(`${r}_e8_1`);
+    slotOrder.push('f4_1', 'f4_2', 'championship');
 
-        // Check if this team is already shown in the game (from results)
-        const existing = gameEl.querySelector(`.master-team[data-team-id="${teamId}"]`);
-        if (existing) continue;
+    for (const slot of slotOrder) {
+        const teamId = picks[slot];
+        if (!teamId) continue;
 
         const team = TEAMS[teamId];
         if (!team) continue;
 
-        // Find a TBD slot to replace
-        const feeders = PROGRESSION[slot];
-        if (!feeders) continue;
+        // Inject into the parent game (the game this slot feeds into)
+        const fi = FEEDS_INTO[slot];
+        if (!fi) continue;
 
-        const tbdEls = gameEl.querySelectorAll('.master-tbd');
-        // Determine which TBD to replace based on feeder position
-        // Check which feeder the user's pick comes from
+        const parentSlot = fi.parent;
+        const parentEl = document.getElementById('mgame-' + parentSlot);
+        if (!parentEl) continue;
+
+        // Check if this team is already shown in the parent game
+        const existing = parentEl.querySelector(`.master-team[data-team-id="${teamId}"]`);
+        if (existing) continue;
+
+        // Find a TBD to replace in the parent
+        const tbdEls = parentEl.querySelectorAll('.master-tbd');
         for (let i = 0; i < tbdEls.length; i++) {
             const tbd = tbdEls[i];
             if (tbd.classList.contains('master-tbd-hidden')) continue;
-            // Replace first available TBD with projected team
             tbd.classList.add('master-tbd-hidden');
             tbd.style.display = 'none';
             const proj = document.createElement('div');
             proj.className = 'game-team master-team master-projected overlay-pending';
-            proj.dataset.slot = slot;
+            proj.dataset.slot = parentSlot;
             proj.dataset.teamId = teamId;
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
@@ -440,15 +456,26 @@ function setupLevDelegation() {
     });
 }
 
+// Calculate what each player scores if a specific team wins a game
+function calcFieldScores(slot, winnerId, winnerSeed, loserSeed, playerIds) {
+    const roundPts = getRoundPoints(slot);
+    // Upset bonus only when lower seed (higher number) wins
+    const bonus = winnerSeed > loserSeed ? calcUpsetBonus(winnerSeed, loserSeed) : 0;
+    const winnerPts = roundPts + bonus;
+    let total = 0;
+    for (const pid of playerIds) {
+        if (getUserPickForSlot(pid, slot) === winnerId) total += winnerPts;
+    }
+    return { winnerPts, fieldTotal: total, fieldAvg: total / playerIds.length };
+}
+
 function applyLeverage() {
-    // Inject projected picks so user sees their bracket path
     injectProjectedPicks(CURRENT_USER_ID);
     setupLevDelegation();
 
-    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
-    let totalRemainingLev = 0;
+    let totalRemainingGain = 0;
     let remainingGames = 0;
     let earnedLev = 0;
 
@@ -460,59 +487,56 @@ function applyLeverage() {
         const result = RESULTS[slot];
         const myPick = getUserPickForSlot(CURRENT_USER_ID, slot);
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
-        const roundPts = getRoundPoints(slot);
 
-        // Mark clickable (visual only — delegation handles clicks)
         gameEl.style.cursor = 'pointer';
 
-        if (result && result.winner_id) {
-            // Completed game — color-code if user had a pick
-            if (myPick) {
-                const bonus = calcUpsetBonus(getSeed(result.team1_id), getSeed(result.team2_id));
-                const pts = roundPts + bonus;
-                const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
-                const fieldAvg = pts * correctCount / totalPlayers;
-                const iCorrect = myPick === result.winner_id;
-                earnedLev += (iCorrect ? pts : 0) - fieldAvg;
+        // Get both teams from DOM
+        const teams = [];
+        teamEls.forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (tid) teams.push({ id: tid, seed: parseInt(el.dataset.seed) || 0 });
+        });
+        const teamA = teams[0];
+        const teamB = teams[1];
 
+        if (result && result.winner_id) {
+            if (myPick) {
+                const wSeed = getSeed(result.winner_id);
+                const lId = result.winner_id === result.team1_id ? result.team2_id : result.team1_id;
+                const lSeed = getSeed(lId);
+                const sc = calcFieldScores(slot, result.winner_id, wSeed, lSeed, playerIds);
+                const iCorrect = myPick === result.winner_id;
+                earnedLev += (iCorrect ? sc.winnerPts : 0) - sc.fieldAvg;
                 teamEls.forEach(el => {
                     const tid = parseInt(el.dataset.teamId);
                     if (tid !== result.winner_id) return;
                     el.classList.add(iCorrect ? 'overlay-correct' : 'overlay-wrong');
                 });
             }
-        } else if (myPick) {
-            // Upcoming game with a pick — color-code leverage
-            const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
-            let seed1 = 0, seed2 = 0;
-            teamEls.forEach(el => {
-                const s = parseInt(el.dataset.seed) || 0;
-                if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
-            });
-            const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
-            const ptsAtStake = roundPts + bonus;
-            const leverage = ptsAtStake * (1 - samePickCount / totalPlayers);
-
-            totalRemainingLev += leverage;
+        } else if (myPick && teamA && teamB) {
+            // Calculate gain if my pick wins
+            const scWin = calcFieldScores(slot, myPick, getSeed(myPick),
+                getSeed(myPick === teamA.id ? teamB.id : teamA.id), playerIds);
+            const gainIfRight = scWin.winnerPts - scWin.fieldAvg;
+            totalRemainingGain += gainIfRight;
             remainingGames++;
 
             teamEls.forEach(el => {
                 const tid = parseInt(el.dataset.teamId);
                 if (tid !== myPick) return;
-                if (leverage >= ptsAtStake * 0.5) el.classList.add('lev-high');
-                else if (leverage >= ptsAtStake * 0.2) el.classList.add('lev-med');
+                if (gainIfRight >= 2) el.classList.add('lev-high');
+                else if (gainIfRight >= 0.5) el.classList.add('lev-med');
                 else el.classList.add('lev-low');
             });
         }
     });
 
-    // Summary bar
     const summaryEl = document.getElementById('master-summary');
     const earnedSign = earnedLev >= 0 ? '+' : '';
-    let summaryParts = [];
-    if (remainingGames > 0) summaryParts.push(`<strong>${totalRemainingLev.toFixed(1)}</strong> leverage remaining (${remainingGames} games)`);
-    summaryParts.push(`Earned: <strong>${earnedSign}${earnedLev.toFixed(1)}</strong> vs field`);
-    summaryEl.innerHTML = summaryParts.join(' | ');
+    let parts = [];
+    if (remainingGames > 0) parts.push(`Leverage remaining: <strong>${totalRemainingGain.toFixed(1)}</strong> pts across ${remainingGames} games`);
+    parts.push(`Earned: <strong>${earnedSign}${earnedLev.toFixed(1)}</strong> vs field`);
+    summaryEl.innerHTML = parts.join(' | ');
 }
 
 function showLevModal(slot) {
@@ -524,7 +548,6 @@ function showLevModal(slot) {
     const rk = getRoundForSlot(slot);
     const roundName = ROUNDS[rk]?.name || rk;
 
-    // Get teams from DOM
     const gameEl = document.getElementById('mgame-' + slot);
     if (!gameEl) return;
     const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
@@ -534,29 +557,24 @@ function showLevModal(slot) {
         if (tid) teams.push({ id: tid, name: el.dataset.name, seed: parseInt(el.dataset.seed) || 0 });
     });
 
-    const team1 = teams[0];
-    const team2 = teams[1];
-    const hasBothTeams = team1 && team2;
-    const bonus = hasBothTeams ? calcUpsetBonus(team1.seed, team2.seed) : 0;
-    const ptsAtStake = roundPts + bonus;
+    const teamA = teams[0];
+    const teamB = teams[1];
+    const hasBoth = teamA && teamB;
 
     // Header
-    const t1Label = team1 ? `(${team1.seed}) ${team1.name}` : 'TBD';
-    const t2Label = team2 ? `(${team2.seed}) ${team2.name}` : 'TBD';
-    document.getElementById('lev-modal-header').textContent = `${roundName} — ${t1Label} vs ${t2Label}`;
+    const aLabel = teamA ? `(${teamA.seed}) ${teamA.name}` : 'TBD';
+    const bLabel = teamB ? `(${teamB.seed}) ${teamB.name}` : 'TBD';
+    document.getElementById('lev-modal-header').textContent = `${roundName} — ${aLabel} vs ${bLabel}`;
 
-    // Field breakdown: group all players by their pick (explicit or implied) for this slot
-    const pickGroups = {};  // teamId -> [player names]
-    const noPick = [];
+    // Field breakdown
+    const pickGroups = {};
+    const noPickNames = [];
     playerIds.forEach(pid => {
         const pick = getUserPickForSlot(pid, slot);
         const name = USERS.find(u => u.id === pid)?.name || '?';
-        if (!pick) {
-            noPick.push(name);
-        } else {
-            if (!pickGroups[pick]) pickGroups[pick] = [];
-            pickGroups[pick].push(name);
-        }
+        if (!pick) { noPickNames.push(name); return; }
+        if (!pickGroups[pick]) pickGroups[pick] = [];
+        pickGroups[pick].push(name);
     });
 
     let html = '';
@@ -564,65 +582,68 @@ function showLevModal(slot) {
     // Your pick
     const myPickName = myPick ? TEAMS[myPick]?.name : null;
     if (myPickName) {
-        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <strong>${myPickName}</strong></div>`;
+        const inGame = hasBoth && (myPick === teamA.id || myPick === teamB.id);
+        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <strong>${myPickName}</strong>${!inGame && hasBoth ? ' (not in this game)' : ''}</div>`;
     } else {
         html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <em>No pick for this game</em></div>`;
     }
 
-    // Field breakdown by team
-    html += `<div class="lev-section">`;
-    for (const [teamId, names] of Object.entries(pickGroups)) {
-        const teamName = TEAMS[teamId]?.name || '?';
-        const isMyPick = parseInt(teamId) === myPick;
-        const label = isMyPick ? `<strong>${teamName}</strong>` : teamName;
-        html += `<div class="lev-diff">${label} (${names.length}): ${names.join(', ')}</div>`;
+    // Field
+    html += `<div class="lev-section"><span class="lev-label">Field:</span> `;
+    const fieldParts = [];
+    for (const [tid, names] of Object.entries(pickGroups)) {
+        const tn = TEAMS[tid]?.name || '?';
+        const bold = parseInt(tid) === myPick;
+        fieldParts.push(`${bold ? '<strong>' : ''}${tn}${bold ? '</strong>' : ''}: ${names.join(', ')} (${names.length})`);
     }
-    if (noPick.length > 0) {
-        html += `<div class="lev-diff" style="color:var(--text-dim)">No pick: ${noPick.join(', ')}</div>`;
+    if (noPickNames.length > 0) fieldParts.push(`<span style="color:var(--text-dim)">No pick: ${noPickNames.join(', ')} (${noPickNames.length})</span>`);
+    html += fieldParts.join(' | ') + '</div>';
+
+    if (!hasBoth) {
+        html += `<div class="lev-section">Matchup TBD</div>`;
+        document.getElementById('lev-modal-body').innerHTML = html;
+        document.getElementById('lev-modal').style.display = 'flex';
+        return;
     }
-    html += `</div>`;
 
-    const agrees = myPick ? (pickGroups[myPick] || []) : [];
-    const sameCount = agrees.length;
-
-    // Points at stake
-    html += `<div class="lev-section"><span class="lev-label">Points at stake:</span> ${roundPts} round`;
-    if (bonus > 0) html += ` + ${bonus} upset bonus`;
-    else if (!hasBothTeams) html += ` (upset bonus TBD)`;
-    html += ` = <strong>${ptsAtStake}</strong></div>`;
-
-    // Net leverage: 0 if no pick (you can't gain or lose without a pick)
-    const leverage = myPick ? ptsAtStake * (1 - sameCount / totalPlayers) : 0;
-    const levColor = leverage > 0 ? 'var(--green)' : 'var(--text-dim)';
-    html += `<div class="lev-section"><span class="lev-label">Net leverage:</span> <strong style="color:${levColor}; font-size: 16px;">${leverage.toFixed(1)}</strong></div>`;
-
-    // Outcome projections / completed result
+    // Completed game
     if (result && result.winner_id) {
-        const winnerName = TEAMS[result.winner_id]?.name || '?';
-        const iCorrect = myPick === result.winner_id;
-        const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
-        const fieldAvg = (ptsAtStake * correctCount / totalPlayers).toFixed(1);
-        const myPts = iCorrect ? ptsAtStake : 0;
-        const net = (myPts - parseFloat(fieldAvg)).toFixed(1);
-        const netSign = parseFloat(net) >= 0 ? '+' : '';
-        const netColor = parseFloat(net) >= 0 ? 'var(--green)' : 'var(--red)';
+        const winnerId = result.winner_id;
+        const loserId = winnerId === teamA.id ? teamB.id : teamA.id;
+        const sc = calcFieldScores(slot, winnerId, getSeed(winnerId), getSeed(loserId), playerIds);
+        const iCorrect = myPick === winnerId;
+        const myPts = iCorrect ? sc.winnerPts : 0;
+        const net = myPts - sc.fieldAvg;
+        const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
+        const netSign = net >= 0 ? '+' : '';
+
         html += `<div class="lev-section lev-result">`;
-        html += `<span class="lev-label">Result:</span> <strong>${winnerName}</strong> won<br>`;
-        html += `You: <strong>${iCorrect ? '+' + ptsAtStake : '0'}</strong> | Field avg: +${fieldAvg} | Net: <strong style="color:${netColor}">${netSign}${net}</strong>`;
+        html += `<strong>RESULT: ${TEAMS[winnerId]?.name} won</strong> (${sc.winnerPts} pts: ${roundPts} round${sc.winnerPts > roundPts ? ' + ' + (sc.winnerPts - roundPts) + ' upset bonus' : ''})<br>`;
+        html += `You: ${iCorrect ? '+' + sc.winnerPts : '0'} | Field avg: +${sc.fieldAvg.toFixed(1)} | <strong style="color:${netColor}">You ${net >= 0 ? 'gained' : 'lost'} ${netSign}${net.toFixed(1)} on field</strong>`;
         html += `</div>`;
-    } else if (myPick && hasBothTeams) {
-        const otherTeam = team1.id === myPick ? team2 : team1;
-        // If your pick wins
-        const correctIfWin = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
-        const fieldAvgIfWin = (ptsAtStake * correctIfWin / totalPlayers).toFixed(1);
-        const netIfWin = (ptsAtStake - parseFloat(fieldAvgIfWin)).toFixed(1);
+    } else if (myPick) {
+        // Upcoming: calculate both outcomes
+        const otherTeam = myPick === teamA.id ? teamB : teamA;
+        const myTeamSeed = getSeed(myPick);
+        const otherSeed = otherTeam.seed;
+
+        // If my pick wins
+        const scWin = calcFieldScores(slot, myPick, myTeamSeed, otherSeed, playerIds);
+        const gainIfRight = scWin.winnerPts - scWin.fieldAvg;
+
         // If other team wins
-        const correctIfLose = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === otherTeam.id).length;
-        const fieldAvgIfLose = (ptsAtStake * correctIfLose / totalPlayers).toFixed(1);
-        const netIfLose = (0 - parseFloat(fieldAvgIfLose)).toFixed(1);
+        const scLose = calcFieldScores(slot, otherTeam.id, otherSeed, myTeamSeed, playerIds);
+        const lossIfWrong = scLose.fieldAvg; // I get 0, field gets this avg
+
         html += `<div class="lev-section">`;
-        html += `If <strong>${TEAMS[myPick]?.name}</strong> wins: You +${ptsAtStake}, field avg +${fieldAvgIfWin}. Net: <strong style="color:var(--green)">+${netIfWin}</strong><br>`;
-        html += `If <strong>${otherTeam.name}</strong> wins: You +0, field avg +${fieldAvgIfLose}. Net: <strong style="color:var(--red)">${netIfLose}</strong>`;
+        html += `<div style="color:var(--green)">If <strong>${TEAMS[myPick]?.name}</strong> wins (your pick):<br>`;
+        html += `You: +${scWin.winnerPts} | Field avg: +${scWin.fieldAvg.toFixed(1)} | You gain <strong>+${gainIfRight.toFixed(1)}</strong> on field</div>`;
+        html += `<div style="color:var(--red); margin-top: 6px;">If <strong>${otherTeam.name}</strong> wins:<br>`;
+        html += `You: +0 | Field avg: +${scLose.fieldAvg.toFixed(1)} | You lose <strong>-${lossIfWrong.toFixed(1)}</strong> to field</div>`;
+        if (lossIfWrong > 0) {
+            const ratio = (gainIfRight / lossIfWrong).toFixed(1);
+            html += `<div style="margin-top: 6px; color: var(--text-dim);">Risk/Reward: risking ${lossIfWrong.toFixed(1)} to gain ${gainIfRight.toFixed(1)} (${ratio}:1)</div>`;
+        }
         html += `</div>`;
     }
 
