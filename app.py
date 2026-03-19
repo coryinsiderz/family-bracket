@@ -528,21 +528,66 @@ def _seed_test_results():
     """Create ~10 R64 game results with a mix of chalk and upsets."""
     teams_by_name = {t.name: t for t in Team.query.all()}
 
-    # (slot, winner_name, loser_name, winner_score, loser_score)
+    # First Four results (round 0, 0 points)
+    ff_results = [
+        ("ff_west_11", "Texas", "NC State", 68, 63),
+        ("ff_midwest_16", "UMBC", "Howard", 72, 65),
+        ("ff_midwest_11", "SMU", "Miami (OH)", 75, 70),
+        ("ff_south_16", "Lehigh", "Prairie View A&M", 69, 60),
+    ]
+    for slot, w_name, l_name, w_score, l_score in ff_results:
+        if GameResult.query.filter_by(game_slot=slot).first():
+            continue
+        w = teams_by_name.get(w_name)
+        l = teams_by_name.get(l_name)
+        if not w or not l:
+            continue
+        db.session.add(GameResult(
+            game_slot=slot,
+            team1_id=w.id, team1_seed=w.seed,
+            team2_id=l.id, team2_seed=l.seed,
+            winner_id=w.id, round_number=0,
+            score_team1=w_score, score_team2=l_score,
+        ))
+
+    # All 32 R64 games. Mix of chalk and upsets for interesting scoring.
     test_results = [
-        # East: 4 games
-        ("east_r64_1", "Duke", "Siena", 82, 58),          # 1 beats 16 (chalk)
-        ("east_r64_2", "TCU", "Ohio State", 71, 68),      # 9 beats 8 (mild upset)
-        ("east_r64_3", "Northern Iowa", "St. John's", 74, 70),  # 12 beats 5 (upset!)
-        ("east_r64_4", "Kansas", "Cal Baptist", 90, 62),   # 4 beats 13 (chalk)
-        # West: 3 games
-        ("west_r64_1", "Arizona", "LIU", 95, 55),         # 1 beats 16 (chalk)
-        ("west_r64_3", "High Point", "Wisconsin", 67, 65), # 12 beats 5 (upset!)
-        ("west_r64_8", "Purdue", "Queens", 88, 60),        # 2 beats 15 (chalk)
-        # South: 3 games
-        ("south_r64_2", "Iowa", "Clemson", 75, 72),        # 9 beats 8 (mild upset)
-        ("south_r64_6", "Illinois", "Penn", 81, 59),       # 3 beats 14 (chalk)
-        ("south_r64_8", "Houston", "Idaho", 92, 54),       # 2 beats 15 (chalk)
+        # EAST (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
+        ("east_r64_1", "Duke", "Siena", 82, 58),
+        ("east_r64_2", "TCU", "Ohio State", 71, 68),       # 9 upset
+        ("east_r64_3", "Northern Iowa", "St. John's", 74, 70),  # 12 upset!
+        ("east_r64_4", "Kansas", "Cal Baptist", 90, 62),
+        ("east_r64_5", "Louisville", "South Florida", 77, 69),
+        ("east_r64_6", "Michigan State", "North Dakota State", 85, 60),
+        ("east_r64_7", "UCF", "UCLA", 66, 64),             # 10 upset
+        ("east_r64_8", "UConn", "Furman", 79, 55),
+        # WEST (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
+        ("west_r64_1", "Arizona", "LIU", 95, 55),
+        ("west_r64_2", "Utah State", "Villanova", 73, 71),  # 9 upset
+        ("west_r64_3", "High Point", "Wisconsin", 67, 65),  # 12 upset!
+        ("west_r64_4", "Arkansas", "Hawaii", 84, 66),
+        ("west_r64_5", "BYU", "Texas", 78, 72),
+        ("west_r64_6", "Gonzaga", "Kennesaw State", 91, 58),
+        ("west_r64_7", "Missouri", "Miami (FL)", 70, 68),   # 10 upset
+        ("west_r64_8", "Purdue", "Queens", 88, 60),
+        # MIDWEST (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
+        ("midwest_r64_1", "Michigan", "UMBC", 86, 62),
+        ("midwest_r64_2", "Georgia", "Saint Louis", 69, 65),
+        ("midwest_r64_3", "Akron", "Texas Tech", 72, 70),   # 12 upset!
+        ("midwest_r64_4", "Alabama", "Hofstra", 93, 67),
+        ("midwest_r64_5", "Tennessee", "SMU", 80, 74),
+        ("midwest_r64_6", "Virginia", "Wright State", 76, 55),
+        ("midwest_r64_7", "Kentucky", "Santa Clara", 83, 71),
+        ("midwest_r64_8", "Iowa State", "Tennessee State", 89, 54),
+        # SOUTH (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
+        ("south_r64_1", "Florida", "Lehigh", 88, 58),
+        ("south_r64_2", "Iowa", "Clemson", 75, 72),         # 9 upset
+        ("south_r64_3", "McNeese", "Vanderbilt", 68, 66),   # 12 upset!
+        ("south_r64_4", "Nebraska", "Troy", 79, 63),
+        ("south_r64_5", "North Carolina", "VCU", 81, 70),
+        ("south_r64_6", "Illinois", "Penn", 81, 59),
+        ("south_r64_7", "Texas A&M", "Saint Mary's", 74, 71),  # 10 upset
+        ("south_r64_8", "Houston", "Idaho", 92, 54),
     ]
 
     count = 0

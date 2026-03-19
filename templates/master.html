@@ -205,19 +205,37 @@ for (const [parent, [c1, c2]] of Object.entries(PROGRESSION)) {
     FEEDS_INTO[c2] = { parent, position: 1 };
 }
 
-// Get a user's implied pick for a slot by tracing their bracket forward
+// Get a user's pick for a slot: explicit first, then implied by tracing forward
+// through the bracket tree. If user picked Duke in S16, that implies Duke wins R32.
 function getUserPickForSlot(userId, slot) {
     const picks = ALL_PICKS[userId] || {};
-    // Direct pick exists
     if (picks[slot]) return picks[slot];
-    // For later rounds: trace backward through feeders
-    // A user's implied pick = they picked a team in a feeder that would advance here
-    const feeders = PROGRESSION[slot];
-    if (!feeders) return null;
-    // Check feeder picks: whoever they picked in each feeder, do they also pick them to win the parent?
-    // Actually simpler: user's pick for this slot IS their direct pick record
-    // The Pick model stores explicit picks per slot, not implied
+
+    // Walk forward: check ancestor slots (the games this slot feeds into)
+    // If user picked a team in an ancestor, and that team is in this slot's
+    // feeder subtree, then that team is the implied pick here.
+    let current = slot;
+    while (FEEDS_INTO[current]) {
+        const { parent } = FEEDS_INTO[current];
+        const parentPick = picks[parent];
+        if (parentPick) {
+            // Verify this team comes through our branch (not the other feeder)
+            if (teamInSubtree(picks, parentPick, slot)) {
+                return parentPick;
+            }
+            return null; // team comes from the other branch
+        }
+        current = parent;
+    }
     return null;
+}
+
+// Check if a user picked teamId somewhere in the subtree rooted at slot
+function teamInSubtree(picks, teamId, slot) {
+    if (picks[slot] === teamId) return true;
+    const feeders = PROGRESSION[slot];
+    if (!feeders) return false;
+    return teamInSubtree(picks, teamId, feeders[0]) || teamInSubtree(picks, teamId, feeders[1]);
 }
 
 // === TOGGLE LOGIC ===
@@ -357,7 +375,7 @@ function applyLeverage() {
         if (rk === 'ff') return;
 
         const result = RESULTS[slot];
-        const myPick = myPicks[slot];
+        const myPick = getUserPickForSlot(CURRENT_USER_ID, slot);
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
         const roundPts = getRoundPoints(slot);
 
@@ -416,10 +434,9 @@ function applyLeverage() {
 }
 
 function showLevModal(slot) {
-    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
-    const myPick = myPicks[slot];
+    const myPick = getUserPickForSlot(CURRENT_USER_ID, slot);
     const result = RESULTS[slot];
     const roundPts = getRoundPoints(slot);
     const rk = getRoundForSlot(slot);
@@ -446,11 +463,11 @@ function showLevModal(slot) {
     const t2Label = team2 ? `(${team2.seed}) ${team2.name}` : 'TBD';
     document.getElementById('lev-modal-header').textContent = `${roundName} — ${t1Label} vs ${t2Label}`;
 
-    // Field breakdown: group all players by their pick for this slot
+    // Field breakdown: group all players by their pick (explicit or implied) for this slot
     const pickGroups = {};  // teamId -> [player names]
     const noPick = [];
     playerIds.forEach(pid => {
-        const pick = ALL_PICKS[pid]?.[slot];
+        const pick = getUserPickForSlot(pid, slot);
         const name = USERS.find(u => u.id === pid)?.name || '?';
         if (!pick) {
             noPick.push(name);
@@ -492,8 +509,8 @@ function showLevModal(slot) {
     else if (!hasBothTeams) html += ` (upset bonus TBD)`;
     html += ` = <strong>${ptsAtStake}</strong></div>`;
 
-    // Net leverage
-    const leverage = ptsAtStake * (1 - sameCount / totalPlayers);
+    // Net leverage: 0 if no pick (you can't gain or lose without a pick)
+    const leverage = myPick ? ptsAtStake * (1 - sameCount / totalPlayers) : 0;
     const levColor = leverage > 0 ? 'var(--green)' : 'var(--text-dim)';
     html += `<div class="lev-section"><span class="lev-label">Net leverage:</span> <strong style="color:${levColor}; font-size: 16px;">${leverage.toFixed(1)}</strong></div>`;
 
