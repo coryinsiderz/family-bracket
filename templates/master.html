@@ -340,11 +340,10 @@ function clearOverlays() {
     });
 }
 
-// Inject the user's full projected bracket into TBD slots.
-// For each game from R32 onward: look at both feeder slots,
-// find which team the user picked to win each feeder, and
-// inject both into this game. Process bottom-up so feeder
-// winners are available for later rounds.
+// Inject the user's projected picks into TBD slots.
+// Only inject for feeder games that have NO result yet.
+// If a feeder has a result, the actual winner is already on the bracket.
+// One team per position — the user's picked winner from each feeder.
 function injectProjectedPicks(userId) {
     const picks = ALL_PICKS[userId] || {};
 
@@ -356,7 +355,7 @@ function injectProjectedPicks(userId) {
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
     slotOrder.push('f4_1', 'f4_2', 'championship');
 
-    function injectTeam(targetSlot, teamId, isWinner) {
+    function injectTeam(targetSlot, teamId) {
         const team = TEAMS[teamId];
         if (!team) return;
         const el = document.getElementById('mgame-' + targetSlot);
@@ -369,7 +368,7 @@ function injectProjectedPicks(userId) {
             tbd.classList.add('master-tbd-hidden');
             tbd.style.display = 'none';
             const proj = document.createElement('div');
-            proj.className = 'game-team master-team master-projected' + (isWinner ? ' overlay-pending' : '');
+            proj.className = 'game-team master-team master-projected';
             proj.dataset.slot = targetSlot;
             proj.dataset.teamId = teamId;
             proj.dataset.seed = team.seed;
@@ -384,16 +383,13 @@ function injectProjectedPicks(userId) {
         const feeders = PROGRESSION[slot];
         if (!feeders) continue;
 
-        // For each feeder, find the user's pick (= the team they expect to advance)
         for (const feederSlot of feeders) {
+            const feederResult = RESULTS[feederSlot];
+            // Only inject if feeder game has NO result yet
+            if (feederResult && feederResult.winner_id) continue;
             const feederPick = picks[feederSlot];
             if (!feederPick) continue;
-            // Check if result already placed this team
-            const gameEl = document.getElementById('mgame-' + slot);
-            if (gameEl && !gameEl.querySelector(`.master-team[data-team-id="${feederPick}"]`)) {
-                const isWinner = picks[slot] === feederPick;
-                injectTeam(slot, feederPick, isWinner);
-            }
+            injectTeam(slot, feederPick);
         }
     }
 }
@@ -428,29 +424,48 @@ function applyMyPicks() {
     let totalPts = 0;
     let correctCount = 0;
 
-    // Inject projected picks into later rounds
+    // Inject projected picks into later rounds (only for unresolved feeders)
     injectProjectedPicks(VIEWING_USER_ID);
-
-    // Track eliminated teams (lost in any round)
-    const eliminatedTeams = new Set();
 
     // For each game on the master bracket, check if user has a pick
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
+        const rk = getRoundForSlot(slot);
         const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
         if (!pickTeamId) return;
 
         const result = RESULTS[slot];
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
 
+        if (rk === 'r64' || rk === 'ff') {
+            // R64: only show point annotations on correct picks, NO overlay colors
+            if (result && result.winner_id && result.winner_id === pickTeamId) {
+                const rp = getRoundPoints(slot);
+                const winnerSeed = getSeed(result.winner_id);
+                const bonus = calcUpsetBonus(result.team1_id ? getSeed(result.team1_id) : 0,
+                                              result.team2_id ? getSeed(result.team2_id) : 0, winnerSeed);
+                const pts = rp + bonus;
+                totalPts += pts;
+                correctCount++;
+                teamEls.forEach(el => {
+                    if (parseInt(el.dataset.teamId) === pickTeamId) {
+                        const ptsEl = document.createElement('span');
+                        ptsEl.className = 'overlay-pts';
+                        ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
+                        el.appendChild(ptsEl);
+                    }
+                });
+            }
+            return;
+        }
+
+        // R32+: apply overlay colors
         teamEls.forEach(el => {
             const tid = parseInt(el.dataset.teamId);
             if (tid !== pickTeamId) return;
 
             if (result && result.winner_id) {
-                // Game completed
                 if (result.winner_id === pickTeamId) {
-                    // Correct pick
                     el.classList.add('overlay-correct');
                     const rp = getRoundPoints(slot);
                     const winnerSeed = getSeed(result.winner_id);
@@ -464,28 +479,11 @@ function applyMyPicks() {
                     ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
                     el.appendChild(ptsEl);
                 } else {
-                    // Wrong pick — team lost
                     el.classList.add('overlay-wrong');
-                    eliminatedTeams.add(pickTeamId);
                 }
-            } else {
-                // Game not yet played - pending pick
-                el.classList.add('overlay-pending');
             }
         });
     });
-
-    // Cascade strikethroughs: for eliminated teams, mark all their
-    // projected appearances in later rounds as busted
-    if (eliminatedTeams.size > 0) {
-        document.querySelectorAll('.master-projected').forEach(el => {
-            const tid = parseInt(el.dataset.teamId);
-            if (eliminatedTeams.has(tid)) {
-                el.classList.remove('overlay-pending');
-                el.classList.add('overlay-wrong');
-            }
-        });
-    }
 
     // Find user rank from board
     const myEntry = BOARD.find(e => e.user_id === VIEWING_USER_ID);
@@ -543,7 +541,7 @@ function applyLeverage() {
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
         const rk = getRoundForSlot(slot);
-        if (rk === 'ff') return;
+        if (rk === 'ff' || rk === 'r64') return;
 
         const result = RESULTS[slot];
         const myPick = getUserPickForSlot(VIEWING_USER_ID, slot);
@@ -757,7 +755,7 @@ function renderVsPlayer(opponentId) {
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
         const rk = getRoundForSlot(slot);
-        if (rk === 'ff') return;
+        if (rk === 'ff' || rk === 'r64') return;
 
         const myPick = myPicks[slot];
         const theirPick = theirPicks[slot];

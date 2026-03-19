@@ -699,7 +699,6 @@ button:disabled {
     background: rgba(229, 57, 53, 0.2) !important;
     border-left: 3px solid var(--red) !important;
     opacity: 1 !important;
-    text-decoration: line-through;
 }
 .overlay-pending {
     opacity: 1 !important;
@@ -847,7 +846,6 @@ button:disabled {
 .exposure-bar { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; min-width: 60px; }
 .exposure-fill { display: block; height: 100%; background: var(--accent-dim); border-radius: 4px; }
 .exposure-pct { width: 80px; text-align: right; color: var(--text-dim); flex-shrink: 0; }
-.master-projected .name { font-style: italic; }
 
 /* What If classes */
 .whatif-simwin {
