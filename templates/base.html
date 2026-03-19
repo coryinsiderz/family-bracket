@@ -8,17 +8,24 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    {% if session.get('user_id') %}
+    {% if session.get('user_id') or session.get('guest') %}
     <nav>
         <div class="left">
             <span class="title">Baltz Bracket</span>
+            {% if session.get('user_id') %}
             <a href="{{ url_for('bracket') }}" class="{{ 'active' if request.endpoint == 'bracket' }}">Bracket</a>
+            {% endif %}
             <a href="{{ url_for('master_bracket') }}" class="{{ 'active' if request.endpoint == 'master_bracket' }}">Master</a>
             <a href="{{ url_for('leaderboard') }}" class="{{ 'active' if request.endpoint == 'leaderboard' }}">Leaderboard</a>
         </div>
         <div class="right">
+            {% if session.get('guest') and not session.get('user_id') %}
+            <span style="color: var(--text-dim);">Guest</span>
+            <a href="{{ url_for('login') }}">Log in</a>
+            {% else %}
             <span>{{ user.name if user else '' }}</span>
             <a href="{{ url_for('logout') }}">Log out</a>
+            {% endif %}
         </div>
     </nav>
     {% endif %}

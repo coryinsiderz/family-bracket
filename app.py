@@ -43,7 +43,10 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 
 @app.context_processor
 def inject_globals():
-    return {"phase1_locked": now_et() >= PHASE1_LOCK}
+    return {
+        "phase1_locked": now_et() >= PHASE1_LOCK,
+        "is_guest": is_guest(),
+    }
 
 
 # --- Helpers ---
@@ -51,7 +54,7 @@ def inject_globals():
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if "user_id" not in session:
+        if "user_id" not in session and not session.get("guest"):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
@@ -61,6 +64,10 @@ def get_current_user():
     if "user_id" in session:
         return User.query.get(session["user_id"])
     return None
+
+
+def is_guest():
+    return session.get("guest", False) and "user_id" not in session
 
 
 def now_et():
@@ -219,30 +226,48 @@ def build_bracket_state(user_id=None):
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        name = request.form.get("name", "").strip().lower()
-        password = request.form.get("password", "")
+        action = request.form.get("action")
 
-        if not name or not password:
-            flash("Name and password required.")
-            return render_template("signup.html")
+        if action == "guest":
+            session["guest"] = True
+            session.pop("user_id", None)
+            return redirect(url_for("master_bracket"))
 
-        if len(password) < 4:
-            flash("Password must be at least 4 characters.")
-            return render_template("signup.html")
+        if action == "claim":
+            user_id = request.form.get("user_id")
+            name = request.form.get("name", "").strip()
+            password = request.form.get("password", "")
 
-        if User.query.filter_by(name=name).first():
-            flash("Name already taken.")
-            return render_template("signup.html")
+            if not user_id or not name or not password:
+                flash("All fields are required.")
+                return redirect(url_for("signup"))
 
-        user = User(name=name)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
+            if len(password) < 4:
+                flash("Password must be at least 4 characters.")
+                return redirect(url_for("signup"))
 
-        session["user_id"] = user.id
-        return redirect(url_for("bracket"))
+            user = User.query.get(int(user_id))
+            if not user or user.password_hash != "":
+                flash("That entry is no longer available.")
+                return redirect(url_for("signup"))
 
-    return render_template("signup.html")
+            # Check if chosen name conflicts with another user
+            existing = User.query.filter(User.name == name, User.id != user.id).first()
+            if existing:
+                flash(f"The name '{name}' is already taken.")
+                return redirect(url_for("signup"))
+
+            user.name = name
+            user.set_password(password)
+            db.session.commit()
+
+            session["user_id"] = user.id
+            session.pop("guest", None)
+            return redirect(url_for("bracket"))
+
+    # Get unclaimed accounts (admin-created with no password)
+    unclaimed = User.query.filter_by(password_hash="").all()
+    return render_template("signup.html", unclaimed=unclaimed)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -251,12 +276,13 @@ def login():
         name = request.form.get("name", "").strip().lower()
         password = request.form.get("password", "")
 
-        user = User.query.filter_by(name=name).first()
-        if not user or not user.check_password(password):
+        user = User.query.filter(db.func.lower(User.name) == name).first()
+        if not user or user.password_hash == "" or not user.check_password(password):
             flash("Invalid name or password.")
             return render_template("login.html")
 
         session["user_id"] = user.id
+        session.pop("guest", None)
         return redirect(url_for("bracket"))
 
     return render_template("login.html")
@@ -265,6 +291,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.pop("user_id", None)
+    session.pop("guest", None)
     return redirect(url_for("login"))
 
 
@@ -274,12 +301,16 @@ def logout():
 def index():
     if "user_id" in session:
         return redirect(url_for("bracket"))
+    if session.get("guest"):
+        return redirect(url_for("master_bracket"))
     return redirect(url_for("login"))
 
 
 @app.route("/bracket")
 @login_required
 def bracket():
+    if is_guest():
+        return redirect(url_for("master_bracket"))
     user = get_current_user()
     pick_count = Pick.query.filter_by(user_id=user.id).count()
     app.logger.info(f"[BRACKET LOAD] user={user.name} (id={user.id}), picks_in_db={pick_count}, session_user_id={session.get('user_id')}")
@@ -305,7 +336,8 @@ def bracket():
 @app.route("/master")
 @login_required
 def master_bracket():
-    user = get_current_user()
+    user = get_current_user()  # None for guests
+    guest = is_guest()
     state = build_bracket_state()  # No user_id = ground truth only
     # Get all users' picks for overlay calculations
     users = User.query.all()
@@ -328,6 +360,7 @@ def master_bracket():
         rounds=ROUNDS,
         progression=BRACKET_PROGRESSION,
         now=now_et(),
+        is_guest=guest,
     )
 
 
@@ -454,7 +487,7 @@ def save_picks():
 def leaderboard():
     locked = phase1_open()
     board = calculate_leaderboard()
-    return render_template("leaderboard.html", board=board, user=get_current_user(), locked=locked)
+    return render_template("leaderboard.html", board=board, user=get_current_user(), locked=locked, is_guest=is_guest())
 
 
 # --- Admin ---

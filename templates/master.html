@@ -48,11 +48,20 @@
     <div class="master-toggle-bar">
         <div class="master-toggles">
             <button class="master-toggle active" data-mode="off">Results</button>
-            <button class="master-toggle" data-mode="picks">My Picks</button>
+            <button class="master-toggle" data-mode="picks">{% if is_guest %}Picks{% else %}My Picks{% endif %}</button>
             <button class="master-toggle" data-mode="leverage">Leverage</button>
             <button class="master-toggle" data-mode="vs">vs Player</button>
             <button class="master-toggle" data-mode="whatif">What If</button>
             <button class="master-toggle" data-mode="exposure">Exposure</button>
+        </div>
+        <!-- Player selector for guest mode (and for My Picks/Leverage/vs when guest) -->
+        <div id="player-selector" style="display: none; margin-top: 8px;">
+            <label style="font-size: 12px; color: var(--text-dim); margin-right: 6px;">Viewing as:</label>
+            <select id="player-select" style="background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 13px; font-family: inherit;">
+                {% for u in users %}
+                <option value="{{ u.id }}">{{ u.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div id="master-summary" class="master-summary"></div>
     </div>
@@ -194,7 +203,9 @@ const LIVE_DATA = {{ state.live | tojson }};
 const TEAMS = {{ state.teams | tojson }};
 const ALL_PICKS = {{ all_picks | tojson }};
 const BOARD = {{ board | tojson }};
-const CURRENT_USER_ID = {{ user.id }};
+const IS_GUEST = {{ 'true' if is_guest else 'false' }};
+const CURRENT_USER_ID = {{ user.id if user else 'null' }};
+let VIEWING_USER_ID = CURRENT_USER_ID; // Who we're viewing picks for (changeable by guests)
 const ROUNDS = {{ rounds | tojson }};
 const USERS = {{ users | tojson(indent=None) }};
 const PROGRESSION = {{ progression | tojson }};
@@ -242,11 +253,37 @@ function teamInSubtree(picks, teamId, slot) {
 // === TOGGLE LOGIC ===
 let activeMode = 'off';
 
+// Modes that require a selected player's picks
+const PLAYER_MODES = ['picks', 'leverage', 'vs'];
+
+function updatePlayerSelector() {
+    const selectorEl = document.getElementById('player-selector');
+    // Show player selector for guest mode on player-dependent overlays,
+    // or always show for picks/leverage/vs so guests can browse any player
+    const needsPlayer = PLAYER_MODES.includes(activeMode) || activeMode === 'exposure';
+    const showSelector = IS_GUEST && PLAYER_MODES.includes(activeMode);
+    selectorEl.style.display = showSelector ? '' : 'none';
+
+    if (IS_GUEST && PLAYER_MODES.includes(activeMode) && !VIEWING_USER_ID) {
+        // Auto-select first user
+        const sel = document.getElementById('player-select');
+        if (sel && sel.options.length > 0) {
+            VIEWING_USER_ID = parseInt(sel.value);
+        }
+    }
+}
+
+document.getElementById('player-select')?.addEventListener('change', function() {
+    VIEWING_USER_ID = parseInt(this.value);
+    applyOverlay(activeMode);
+});
+
 document.querySelectorAll('.master-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.master-toggle').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeMode = btn.dataset.mode;
+        updatePlayerSelector();
         applyOverlay(activeMode);
     });
 });
@@ -260,6 +297,12 @@ function applyOverlay(mode) {
     summaryEl.textContent = '';
     controlsEl.style.display = 'none';
     controlsEl.innerHTML = '';
+
+    // For player-dependent modes, need a valid VIEWING_USER_ID
+    if (PLAYER_MODES.includes(mode) && !VIEWING_USER_ID) {
+        summaryEl.textContent = 'Select a player to view their picks.';
+        return;
+    }
 
     if (mode === 'off') {
         document.getElementById('master-bracket-wrapper').style.display = '';
@@ -379,17 +422,17 @@ function calcUpsetBonus(seed1, seed2) {
 
 // === MY PICKS OVERLAY ===
 function applyMyPicks() {
-    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
     let totalPts = 0;
     let correctCount = 0;
 
     // Inject projected picks into later rounds
-    injectProjectedPicks(CURRENT_USER_ID);
+    injectProjectedPicks(VIEWING_USER_ID);
 
     // For each game on the master bracket, check if user has a pick
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
-        const pickTeamId = getUserPickForSlot(CURRENT_USER_ID, slot);
+        const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
         if (!pickTeamId) return;
 
         const result = RESULTS[slot];
@@ -426,7 +469,7 @@ function applyMyPicks() {
     });
 
     // Find user rank from board
-    const myEntry = BOARD.find(e => e.user_id === CURRENT_USER_ID);
+    const myEntry = BOARD.find(e => e.user_id === VIEWING_USER_ID);
     const rank = myEntry ? myEntry.rank : '-';
     const total = myEntry ? myEntry.total : totalPts;
     const summaryEl = document.getElementById('master-summary');
@@ -469,7 +512,7 @@ function calcFieldScores(slot, winnerId, winnerSeed, loserSeed, playerIds) {
 }
 
 function applyLeverage() {
-    injectProjectedPicks(CURRENT_USER_ID);
+    injectProjectedPicks(VIEWING_USER_ID);
     setupLevDelegation();
 
     const playerIds = Object.keys(ALL_PICKS).map(Number);
@@ -484,7 +527,7 @@ function applyLeverage() {
         if (rk === 'ff') return;
 
         const result = RESULTS[slot];
-        const myPick = getUserPickForSlot(CURRENT_USER_ID, slot);
+        const myPick = getUserPickForSlot(VIEWING_USER_ID, slot);
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
 
         gameEl.style.cursor = 'pointer';
@@ -541,7 +584,7 @@ function applyLeverage() {
 function showLevModal(slot) {
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
-    const myPick = getUserPickForSlot(CURRENT_USER_ID, slot);
+    const myPick = getUserPickForSlot(VIEWING_USER_ID, slot);
     const result = RESULTS[slot];
     const roundPts = getRoundPoints(slot);
     const rk = getRoundForSlot(slot);
@@ -667,7 +710,7 @@ function applyVsPlayer() {
     controlsEl.style.display = 'block';
 
     // Build player dropdown
-    const otherUsers = USERS.filter(u => u.id !== CURRENT_USER_ID);
+    const otherUsers = USERS.filter(u => u.id !== VIEWING_USER_ID);
     let html = '<label style="margin-right: 8px;">Compare with:</label><select id="vs-player-select">';
     html += '<option value="">-- Select --</option>';
     otherUsers.forEach(u => {
@@ -684,7 +727,7 @@ function applyVsPlayer() {
 }
 
 function renderVsPlayer(opponentId) {
-    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
     const theirPicks = ALL_PICKS[opponentId] || {};
     const opponentName = USERS.find(u => u.id === opponentId)?.name || '?';
     let swingGames = 0;
@@ -766,7 +809,7 @@ function renderVsPlayer(opponentId) {
     });
 
     // Summary
-    const myEntry = BOARD.find(e => e.user_id === CURRENT_USER_ID);
+    const myEntry = BOARD.find(e => e.user_id === VIEWING_USER_ID);
     const theirEntry = BOARD.find(e => e.user_id === opponentId);
     const myTotal = myEntry?.total || 0;
     const theirTotal = theirEntry?.total || 0;
@@ -852,7 +895,7 @@ function renderWhatIf() {
     // Build mini leaderboard
     let html = `<span style="color: var(--text-dim);">${simCount} simulated | </span>`;
     simBoard.slice(0, 6).forEach(entry => {
-        const isMe = entry.user_id === CURRENT_USER_ID;
+        const isMe = entry.user_id === VIEWING_USER_ID;
         const style = isMe ? 'color: var(--accent); font-weight: 700;' : '';
         const rankChange = entry.rank - entry.actualRank;
         const arrow = rankChange < 0 ? `<span style="color:var(--green);">&uarr;${Math.abs(rankChange)}</span>` :
@@ -917,7 +960,7 @@ function calcSimulatedBoard() {
 function applyExposure() {
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
-    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
 
     // Round display order
     const roundOrder = [
