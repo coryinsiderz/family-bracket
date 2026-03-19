@@ -97,6 +97,8 @@ def calculate_leaderboard():
     board = []
     for user in users:
         score = calculate_user_score(user.id)
+        # Per-round totals (round pts + bonus combined)
+        pr = score["per_round"]
         board.append({
             "user_id": user.id,
             "name": user.name,
@@ -106,8 +108,15 @@ def calculate_leaderboard():
             "round_points": score["round_points"],
             "bonus_points": score["bonus_points"],
             "correct_picks": score["correct_picks"],
+            "r64": pr.get("r64", {}).get("points", 0) + pr.get("r64", {}).get("bonus", 0),
+            "r32": pr.get("r32", {}).get("points", 0) + pr.get("r32", {}).get("bonus", 0),
+            "s16": pr.get("s16", {}).get("points", 0) + pr.get("s16", {}).get("bonus", 0),
+            "e8": pr.get("e8", {}).get("points", 0) + pr.get("e8", {}).get("bonus", 0),
+            "f4": pr.get("f4", {}).get("points", 0) + pr.get("f4", {}).get("bonus", 0),
+            "championship": pr.get("championship", {}).get("points", 0) + pr.get("championship", {}).get("bonus", 0),
         })
-    board.sort(key=lambda x: x["total"], reverse=True)
+    # Sort by total descending, then alphabetical by name for tiebreaker
+    board.sort(key=lambda x: (-x["total"], x["name"].lower()))
     # Standard competition ranking: ties get the same rank,
     # next rank skips (e.g. 1, 1, 3, 4, 4, 6)
     for i, entry in enumerate(board):

@@ -11,30 +11,38 @@
             <thead>
                 <tr>
                     <th class="rank">#</th>
-                    <th class="paid-col" title="Paid">$</th>
-                    <th class="submitted-col" title="Submitted">✎</th>
                     <th>Name</th>
                     {% if not locked %}
-                    <th class="text-right">Correct</th>
-                    <th class="text-right">Round Pts</th>
-                    <th class="text-right">Bonus Pts</th>
-                    <th class="text-right">Total</th>
+                    <th class="text-right total">Total</th>
+                    <th class="text-right round-col">R64</th>
+                    <th class="text-right round-col">R32</th>
+                    <th class="text-right round-col">S16</th>
+                    <th class="text-right round-col">E8</th>
+                    <th class="text-right round-col">F4</th>
+                    <th class="text-right round-col">Champ</th>
+                    <th class="text-right round-col" title="Total Upset Bonus">Bonus</th>
                     {% endif %}
+                    <th class="submitted-col" title="Submitted">Sub</th>
+                    <th class="paid-col" title="Paid">$</th>
                 </tr>
             </thead>
             <tbody>
                 {% for entry in board %}
                 <tr class="{{ 'you' if entry.user_id == user.id }}">
                     <td class="rank">{{ entry.rank }}</td>
-                    <td class="paid-col">{{ '✓' if entry.paid else '' }}</td>
-                    <td class="submitted-col">{{ '✓' if entry.submitted else '' }}</td>
                     <td class="name-col">{{ entry.name }}</td>
                     {% if not locked %}
-                    <td class="text-right">{{ entry.correct_picks }}</td>
-                    <td class="text-right">{{ entry.round_points }}</td>
-                    <td class="text-right">{{ entry.bonus_points }}</td>
                     <td class="text-right total">{{ entry.total }}</td>
+                    <td class="text-right round-col">{{ entry.r64 or '' }}</td>
+                    <td class="text-right round-col">{{ entry.r32 or '' }}</td>
+                    <td class="text-right round-col">{{ entry.s16 or '' }}</td>
+                    <td class="text-right round-col">{{ entry.e8 or '' }}</td>
+                    <td class="text-right round-col">{{ entry.f4 or '' }}</td>
+                    <td class="text-right round-col">{{ entry.championship or '' }}</td>
+                    <td class="text-right round-col">{{ entry.bonus_points or '' }}</td>
                     {% endif %}
+                    <td class="submitted-col">{{ '✓' if entry.submitted else '' }}</td>
+                    <td class="paid-col">{{ '✓' if entry.paid else '' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
