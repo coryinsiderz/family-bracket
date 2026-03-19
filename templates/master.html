@@ -427,15 +427,36 @@ function applyMyPicks() {
     // Inject projected picks into later rounds (only for unresolved feeders)
     injectProjectedPicks(VIEWING_USER_ID);
 
-    // R64/FF: NOTHING. No colors, no annotations. Skip entirely.
-    // R32+: forward-looking. Each team shown gets GREEN if it matches
-    // the user's pick from the FEEDER round, RED if not. No color if
-    // feeder game is pending. Point annotations on green teams show
-    // points earned from the feeder game result.
+    // R64: point annotations on correct picks, NO colors.
+    // R32+: forward-looking GREEN/RED coloring based on feeder picks.
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
         const rk = getRoundForSlot(slot);
-        if (rk === 'r64' || rk === 'ff') return; // nothing in R64
+
+        if (rk === 'r64') {
+            // R64: only point annotations on correct picks, no colors
+            const result = RESULTS[slot];
+            const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
+            if (result && result.winner_id && pickTeamId === result.winner_id) {
+                const rp = getRoundPoints(slot);
+                const winnerSeed = getSeed(result.winner_id);
+                const bonus = calcUpsetBonus(
+                    getSeed(result.team1_id), getSeed(result.team2_id), winnerSeed);
+                totalPts += rp + bonus;
+                correctCount++;
+                const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+                teamEls.forEach(el => {
+                    if (parseInt(el.dataset.teamId) === pickTeamId) {
+                        const ptsEl = document.createElement('span');
+                        ptsEl.className = 'overlay-pts';
+                        ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
+                        el.appendChild(ptsEl);
+                    }
+                });
+            }
+            return;
+        }
+        if (rk === 'ff') return;
 
         const feeders = PROGRESSION[slot];
         if (!feeders) return;
@@ -463,21 +484,8 @@ function applyMyPicks() {
             const feederPick = getUserPickForSlot(VIEWING_USER_ID, fromFeeder);
 
             if (feederPick === tid) {
-                // User correctly picked this team to win the feeder game
+                // User correctly picked this team — green
                 el.classList.add('overlay-correct');
-                correctCount++;
-                // Show points from the feeder game
-                const fResult = RESULTS[fromFeeder];
-                const rp = getRoundPoints(fromFeeder);
-                const winnerSeed = getSeed(fResult.winner_id);
-                const bonus = calcUpsetBonus(
-                    getSeed(fResult.team1_id), getSeed(fResult.team2_id), winnerSeed);
-                const pts = rp + bonus;
-                totalPts += pts;
-                const ptsEl = document.createElement('span');
-                ptsEl.className = 'overlay-pts';
-                ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
-                el.appendChild(ptsEl);
             } else {
                 // User picked a different team — this is the wrong result for them
                 el.classList.add('overlay-wrong');
