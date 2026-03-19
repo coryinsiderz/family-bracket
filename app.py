@@ -160,17 +160,27 @@ def build_bracket_state(user_id=None):
         feeders = get_feeder_slots(slot)
         round_key = get_round_for_slot(slot)
 
-        # Determine teams from feeder results or picks
+        # Determine teams from user's picks (preferred) or feeder results.
+        # Shows the user's projected bracket — their picks with status.
         def resolve_team(feeder_slot):
-            """Get the team occupying a slot from result or pick."""
-            result = results.get(feeder_slot)
-            if result and result.winner:
-                w = result.winner
-                return {"id": w.id, "name": w.name, "seed": w.seed}
+            """Get the team for this position: user's pick if exists, else feeder winner."""
             pick_id = picks.get(feeder_slot)
+            feeder_result = results.get(feeder_slot)
             if pick_id and pick_id in teams:
                 t = teams[pick_id]
-                return {"id": t.id, "name": t.name, "seed": t.seed, "projected": True}
+                entry = {"id": t.id, "name": t.name, "seed": t.seed}
+                if feeder_result and feeder_result.winner_id:
+                    if feeder_result.winner_id == pick_id:
+                        entry["alive"] = True
+                    else:
+                        entry["eliminated"] = True
+                else:
+                    entry["projected"] = True  # feeder game pending
+                return entry
+            # No pick — fall back to actual winner
+            if feeder_result and feeder_result.winner:
+                w = feeder_result.winner
+                return {"id": w.id, "name": w.name, "seed": w.seed}
             return None
 
         team1 = resolve_team(feeders[0]) if feeders else None

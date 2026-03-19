@@ -420,23 +420,75 @@ function calcUpsetBonus(seed1, seed2, winnerSeed) {
 }
 
 // === MY PICKS OVERLAY ===
+// Build set of eliminated team IDs from all completed game results
+function getEliminatedTeams() {
+    const eliminated = new Set();
+    for (const [slot, result] of Object.entries(RESULTS)) {
+        if (!result.winner_id) continue;
+        // The loser is eliminated
+        if (result.team1_id && result.team1_id !== result.winner_id) eliminated.add(result.team1_id);
+        if (result.team2_id && result.team2_id !== result.winner_id) eliminated.add(result.team2_id);
+    }
+    return eliminated;
+}
+
+// Inject the user's picks into R32+ slots, REPLACING actual results.
+// Shows the user's projected bracket, not ground truth.
+function injectUserBracket(userId) {
+    const picks = ALL_PICKS[userId] || {};
+    const slotOrder = [];
+    const regions = ['east', 'west', 'midwest', 'south'];
+    for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
+    for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
+    for (const r of regions) slotOrder.push(`${r}_e8_1`);
+    slotOrder.push('f4_1', 'f4_2', 'championship');
+
+    for (const slot of slotOrder) {
+        const feeders = PROGRESSION[slot];
+        if (!feeders) continue;
+        const gameEl = document.getElementById('mgame-' + slot);
+        if (!gameEl) continue;
+
+        // Hide ALL existing team elements and TBDs in this slot
+        gameEl.querySelectorAll('.master-team, .master-tbd').forEach(el => {
+            el.classList.add('master-tbd-hidden');
+            el.style.display = 'none';
+        });
+
+        // For each feeder, inject the user's pick (the team they picked to win that feeder)
+        for (const feederSlot of feeders) {
+            const feederPick = picks[feederSlot];
+            if (!feederPick) continue;
+            const team = TEAMS[feederPick];
+            if (!team) continue;
+            const proj = document.createElement('div');
+            proj.className = 'game-team master-team master-projected';
+            proj.dataset.slot = slot;
+            proj.dataset.teamId = feederPick;
+            proj.dataset.seed = team.seed;
+            proj.dataset.name = team.name;
+            proj.dataset.feederSlot = feederSlot;
+            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
+            gameEl.appendChild(proj);
+        }
+    }
+}
+
 function applyMyPicks() {
-    const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
+    const picks = ALL_PICKS[VIEWING_USER_ID] || {};
     let totalPts = 0;
     let correctCount = 0;
+    const eliminated = getEliminatedTeams();
 
-    // Inject projected picks into later rounds (only for unresolved feeders)
-    injectProjectedPicks(VIEWING_USER_ID);
+    // Replace R32+ with user's projected bracket
+    injectUserBracket(VIEWING_USER_ID);
 
-    // R64: point annotations on correct picks, NO colors.
-    // R32+: forward-looking GREEN/RED coloring based on feeder picks.
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
         const rk = getRoundForSlot(slot);
 
         if (rk === 'r64') {
             // R64: no colors — just point annotations on correct picks
-            const teamEls = gameEl.querySelectorAll('.master-team');
             const result = RESULTS[slot];
             const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
             if (result && result.winner_id && pickTeamId === result.winner_id) {
@@ -446,7 +498,7 @@ function applyMyPicks() {
                     getSeed(result.team1_id), getSeed(result.team2_id), winnerSeed);
                 totalPts += rp + bonus;
                 correctCount++;
-                teamEls.forEach(el => {
+                gameEl.querySelectorAll('.master-team').forEach(el => {
                     if (parseInt(el.dataset.teamId) === pickTeamId) {
                         const ptsEl = document.createElement('span');
                         ptsEl.className = 'overlay-pts';
@@ -459,37 +511,48 @@ function applyMyPicks() {
         }
         if (rk === 'ff') return;
 
+        // R32+: color user's projected picks
+        const winnerPick = picks[slot]; // who user picked to WIN this game
         const feeders = PROGRESSION[slot];
-        if (!feeders) return;
 
-        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
-
-        teamEls.forEach(el => {
+        gameEl.querySelectorAll('.master-projected').forEach(el => {
             const tid = parseInt(el.dataset.teamId);
             if (!tid) return;
-            const isProjected = el.classList.contains('master-projected');
-            if (isProjected) return; // feeder pending — no color
+            const feederSlot = el.dataset.feederSlot;
 
-            // Find which feeder this team came from
-            let fromFeeder = null;
-            for (const fSlot of feeders) {
-                const fResult = RESULTS[fSlot];
-                if (fResult && fResult.winner_id === tid) {
-                    fromFeeder = fSlot;
-                    break;
-                }
+            // Bold the user's winner pick for this specific round
+            if (tid === winnerPick) {
+                el.querySelector('.name').style.fontWeight = '700';
             }
-            if (!fromFeeder) return; // team not from a completed feeder
 
-            // Get user's pick for the feeder game
-            const feederPick = getUserPickForSlot(VIEWING_USER_ID, fromFeeder);
+            // Check feeder result to determine status
+            const feederResult = feederSlot ? RESULTS[feederSlot] : null;
 
-            if (feederPick === tid) {
-                // User correctly picked this team — green
-                el.classList.add('overlay-correct');
-            } else {
-                // User picked a different team — this is the wrong result for them
+            if (!feederResult || !feederResult.winner_id) {
+                // Feeder game pending — no color
+                return;
+            }
+
+            // Feeder game is complete
+            if (eliminated.has(tid)) {
+                // User's pick has been eliminated
                 el.classList.add('overlay-wrong');
+            } else {
+                // User's pick is still alive (won feeder game)
+                el.classList.add('overlay-correct');
+                // Add point annotation if user correctly picked this feeder
+                if (feederResult.winner_id === tid) {
+                    const rp = getRoundPoints(feederSlot);
+                    const winnerSeed = getSeed(feederResult.winner_id);
+                    const bonus = calcUpsetBonus(
+                        getSeed(feederResult.team1_id), getSeed(feederResult.team2_id), winnerSeed);
+                    totalPts += rp + bonus;
+                    correctCount++;
+                    const ptsEl = document.createElement('span');
+                    ptsEl.className = 'overlay-pts';
+                    ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
+                    el.appendChild(ptsEl);
+                }
             }
         });
     });

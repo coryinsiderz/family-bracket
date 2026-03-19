@@ -700,6 +700,9 @@ button:disabled {
     border-left: 3px solid var(--red) !important;
     opacity: 1 !important;
 }
+.overlay-wrong .name {
+    text-decoration: line-through;
+}
 .overlay-pending {
     opacity: 1 !important;
 }

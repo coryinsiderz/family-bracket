@@ -151,7 +151,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'projected' if team.projected|default(false) else '' }} {{ 'locked' if not phase1_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase1_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -159,15 +159,7 @@
                              data-phase="1"
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
-                            <span class="name">{{ team.name }}</span>
-                            {% set live = state.live.get(slot) %}
-                            {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
-                            <span class="score">{{ game.result.score_team1 }}</span>
-                            {% elif loop.index == 2 and game.result and game.result.score_team2 is not none %}
-                            <span class="score">{{ game.result.score_team2 }}</span>
-                            {% elif live and live.status == 'in_progress' %}
-                            <span class="score live-score">{{ live.team1_score if loop.index == 1 else live.team2_score }}</span>
-                            {% endif %}
+                            <span class="name"{% if game.pick == team.id %} style="font-weight: 700;"{% endif %}>{{ team.name }}</span>
                         </div>
                         {% else %}
                         <div class="game-team locked" style="opacity: 0.3;">
@@ -199,7 +191,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -246,7 +238,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -300,7 +292,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -344,7 +336,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
@@ -388,7 +380,7 @@
                     <div class="game" id="game-{{ slot }}">
                         {% for team in [game.team1, game.team2] %}
                         {% if team %}
-                        <div class="game-team {{ 'picked' if game.pick == team.id else '' }} {{ 'correct' if game.result and game.result.winner_id == team.id and game.pick == team.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id else '' }} {{ 'locked' if not phase2_open else '' }}"
+                        <div class="game-team {{ 'correct' if team.alive|default(false) else '' }} {{ 'wrong' if team.eliminated|default(false) else '' }} {{ 'locked' if not phase2_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ team.id }}"
                              data-seed="{{ team.seed }}"
