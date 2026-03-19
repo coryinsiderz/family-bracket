@@ -10,8 +10,9 @@
     {% set live = state.live.get(slot) %}
     {% set is_winner = result and result.winner_id == team.id if (result and team) else false %}
     {% set is_loser = result and result.winner_id and result.winner_id != team.id if (result and team) else false %}
+    {% set is_r64 = '_r64_' in slot %}
     {% if team %}
-    <div class="game-team master-team {{ 'master-winner' if is_winner else '' }} {{ 'master-loser' if is_loser else '' }}"
+    <div class="game-team master-team {{ 'master-winner' if is_winner and not is_r64 else '' }} {{ 'master-loser' if is_loser and not is_r64 else '' }}"
          data-slot="{{ slot }}"
          data-team-id="{{ team.id }}"
          data-seed="{{ team.seed }}"
@@ -326,9 +327,6 @@ function clearOverlays() {
                            'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong',
                            'lev-high', 'lev-med', 'lev-low',
                            'whatif-sim', 'whatif-simwin');
-        // Restore master-winner/master-loser if they were stripped
-        if (el.dataset.origWinner === '1') el.classList.add('master-winner');
-        if (el.dataset.origLoser === '1') el.classList.add('master-loser');
         const ann = el.querySelector('.overlay-ann');
         if (ann) ann.remove();
         const pts = el.querySelector('.overlay-pts');
@@ -437,13 +435,8 @@ function applyMyPicks() {
         const rk = getRoundForSlot(slot);
 
         if (rk === 'r64') {
-            // R64: strip ALL colors (winner/loser), add point annotation only
+            // R64: no colors — just point annotations on correct picks
             const teamEls = gameEl.querySelectorAll('.master-team');
-            teamEls.forEach(el => {
-                if (el.classList.contains('master-winner')) el.dataset.origWinner = '1';
-                if (el.classList.contains('master-loser')) el.dataset.origLoser = '1';
-                el.classList.remove('master-winner', 'master-loser');
-            });
             const result = RESULTS[slot];
             const pickTeamId = getUserPickForSlot(VIEWING_USER_ID, slot);
             if (result && result.winner_id && pickTeamId === result.winner_id) {
@@ -548,8 +541,9 @@ function applyLeverage() {
     injectProjectedPicks(VIEWING_USER_ID);
     setupLevDelegation();
 
+    // No visual coloring at all — just make R32+ games clickable for modal
+    // and calculate summary numbers
     const playerIds = Object.keys(ALL_PICKS).map(Number);
-    const totalPlayers = playerIds.length;
     let totalRemainingGain = 0;
     let remainingGames = 0;
     let earnedLev = 0;
@@ -559,13 +553,12 @@ function applyLeverage() {
         const rk = getRoundForSlot(slot);
         if (rk === 'ff' || rk === 'r64') return;
 
+        gameEl.style.cursor = 'pointer';
+
         const result = RESULTS[slot];
         const myPick = getUserPickForSlot(VIEWING_USER_ID, slot);
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
 
-        gameEl.style.cursor = 'pointer';
-
-        // Get both teams from DOM
         const teams = [];
         teamEls.forEach(el => {
             const tid = parseInt(el.dataset.teamId);
@@ -574,35 +567,19 @@ function applyLeverage() {
         const teamA = teams[0];
         const teamB = teams[1];
 
-        if (result && result.winner_id) {
-            if (myPick) {
-                const wSeed = getSeed(result.winner_id);
-                const lId = result.winner_id === result.team1_id ? result.team2_id : result.team1_id;
-                const lSeed = getSeed(lId);
-                const sc = calcFieldScores(slot, result.winner_id, wSeed, lSeed, playerIds);
-                const iCorrect = myPick === result.winner_id;
-                earnedLev += (iCorrect ? sc.winnerPts : 0) - sc.fieldAvg;
-                teamEls.forEach(el => {
-                    const tid = parseInt(el.dataset.teamId);
-                    if (tid !== result.winner_id) return;
-                    el.classList.add(iCorrect ? 'overlay-correct' : 'overlay-wrong');
-                });
-            }
+        if (result && result.winner_id && myPick) {
+            const wSeed = getSeed(result.winner_id);
+            const lId = result.winner_id === result.team1_id ? result.team2_id : result.team1_id;
+            const lSeed = getSeed(lId);
+            const sc = calcFieldScores(slot, result.winner_id, wSeed, lSeed, playerIds);
+            const iCorrect = myPick === result.winner_id;
+            earnedLev += (iCorrect ? sc.winnerPts : 0) - sc.fieldAvg;
         } else if (myPick && teamA && teamB) {
-            // Calculate gain if my pick wins
             const scWin = calcFieldScores(slot, myPick, getSeed(myPick),
                 getSeed(myPick === teamA.id ? teamB.id : teamA.id), playerIds);
             const gainIfRight = scWin.winnerPts - scWin.fieldAvg;
             totalRemainingGain += gainIfRight;
             remainingGames++;
-
-            teamEls.forEach(el => {
-                const tid = parseInt(el.dataset.teamId);
-                if (tid !== myPick) return;
-                if (gainIfRight >= 2) el.classList.add('lev-high');
-                else if (gainIfRight >= 0.5) el.classList.add('lev-med');
-                else el.classList.add('lev-low');
-            });
         }
     });
 

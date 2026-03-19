@@ -57,7 +57,7 @@
                     {% if game %}
                     <div class="game" id="game-{{ slot }}">
                         {% if game.team1 %}
-                        <div class="game-team {{ 'picked' if game.pick == game.team1.id else '' }} {{ 'correct' if game.result and game.result.winner_id == game.team1.id and game.pick == game.team1.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != game.team1.id and game.pick == game.team1.id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                        <div class="game-team {{ 'locked' if not phase1_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ game.team1.id }}"
                              data-seed="{{ game.team1.seed }}"
@@ -110,7 +110,7 @@
                                 </div>
                             {% endif %}
                         {% elif game.team2 %}
-                        <div class="game-team {{ 'picked' if game.pick == game.team2.id else '' }} {{ 'correct' if game.result and game.result.winner_id == game.team2.id and game.pick == game.team2.id else '' }} {{ 'wrong' if game.result and game.result.winner_id and game.result.winner_id != game.team2.id and game.pick == game.team2.id else '' }} {{ 'locked' if not phase1_open else '' }}"
+                        <div class="game-team {{ 'locked' if not phase1_open else '' }}"
                              data-slot="{{ slot }}"
                              data-team-id="{{ game.team2.id }}"
                              data-seed="{{ game.team2.seed }}"
