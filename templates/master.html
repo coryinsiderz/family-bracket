@@ -297,24 +297,23 @@ function clearOverlays() {
     });
 }
 
-// Inject projected picks from a user into TBD slots on the bracket.
-// Two passes: (1) show user's pick in each game slot, (2) propagate
-// winners to parent slots (R32 winners -> S16, etc.)
+// Inject the user's full projected bracket into TBD slots.
+// For each game from R32 onward: look at both feeder slots,
+// find which team the user picked to win each feeder, and
+// inject both into this game. Process bottom-up so feeder
+// winners are available for later rounds.
 function injectProjectedPicks(userId) {
     const picks = ALL_PICKS[userId] || {};
 
+    // Build slot order: R32 first, then S16, E8, F4, Championship
     const slotOrder = [];
     const regions = ['east', 'west', 'midwest', 'south'];
-    for (const r of regions) {
-        for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
-    }
-    for (const r of regions) {
-        for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
-    }
+    for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
+    for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
     slotOrder.push('f4_1', 'f4_2', 'championship');
 
-    function injectTeam(targetSlot, teamId) {
+    function injectTeam(targetSlot, teamId, isWinner) {
         const team = TEAMS[teamId];
         if (!team) return;
         const el = document.getElementById('mgame-' + targetSlot);
@@ -327,7 +326,7 @@ function injectProjectedPicks(userId) {
             tbd.classList.add('master-tbd-hidden');
             tbd.style.display = 'none';
             const proj = document.createElement('div');
-            proj.className = 'game-team master-team master-projected overlay-pending';
+            proj.className = 'game-team master-team master-projected' + (isWinner ? ' overlay-pending' : '');
             proj.dataset.slot = targetSlot;
             proj.dataset.teamId = teamId;
             proj.dataset.seed = team.seed;
@@ -339,15 +338,20 @@ function injectProjectedPicks(userId) {
     }
 
     for (const slot of slotOrder) {
-        const teamId = picks[slot];
-        if (!teamId) continue;
+        const feeders = PROGRESSION[slot];
+        if (!feeders) continue;
 
-        // Pass 1: show the picked team in THIS game's slot
-        injectTeam(slot, teamId);
-
-        // Pass 2: propagate the winner to the parent game
-        const fi = FEEDS_INTO[slot];
-        if (fi) injectTeam(fi.parent, teamId);
+        // For each feeder, find the user's pick (= the team they expect to advance)
+        for (const feederSlot of feeders) {
+            const feederPick = picks[feederSlot];
+            if (!feederPick) continue;
+            // Check if result already placed this team
+            const gameEl = document.getElementById('mgame-' + slot);
+            if (gameEl && !gameEl.querySelector(`.master-team[data-team-id="${feederPick}"]`)) {
+                const isWinner = picks[slot] === feederPick;
+                injectTeam(slot, feederPick, isWinner);
+            }
+        }
     }
 }
 
