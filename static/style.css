@@ -702,8 +702,6 @@ button:disabled {
     text-decoration: line-through;
 }
 .overlay-pending {
-    background: rgba(74, 158, 255, 0.12) !important;
-    border-left: 3px solid var(--accent) !important;
     opacity: 1 !important;
 }
 .overlay-pts {

@@ -413,11 +413,13 @@ function getRoundPoints(slot) {
     return ROUNDS[rk] ? ROUNDS[rk].points : 0;
 }
 
-function calcUpsetBonus(seed1, seed2) {
-    const hi = Math.min(seed1, seed2);
-    const lo = Math.max(seed1, seed2);
-    if (hi === 0) return 0;
-    return Math.round(lo / hi);
+function calcUpsetBonus(seed1, seed2, winnerSeed) {
+    const favorite = Math.min(seed1, seed2);  // lower number = favorite
+    const underdog = Math.max(seed1, seed2);   // higher number = underdog
+    if (favorite === 0 || favorite === underdog) return 0;
+    // Only award bonus when the underdog (higher seed number) wins
+    if (winnerSeed !== underdog) return 0;
+    return Math.round(underdog / favorite);
 }
 
 // === MY PICKS OVERLAY ===
@@ -451,8 +453,9 @@ function applyMyPicks() {
                     // Correct pick
                     el.classList.add('overlay-correct');
                     const rp = getRoundPoints(slot);
+                    const winnerSeed = getSeed(result.winner_id);
                     const bonus = calcUpsetBonus(result.team1_id ? getSeed(result.team1_id) : 0,
-                                                  result.team2_id ? getSeed(result.team2_id) : 0);
+                                                  result.team2_id ? getSeed(result.team2_id) : 0, winnerSeed);
                     const pts = rp + bonus;
                     totalPts += pts;
                     correctCount++;
@@ -518,7 +521,7 @@ function setupLevDelegation() {
 function calcFieldScores(slot, winnerId, winnerSeed, loserSeed, playerIds) {
     const roundPts = getRoundPoints(slot);
     // Upset bonus only when lower seed (higher number) wins
-    const bonus = winnerSeed > loserSeed ? calcUpsetBonus(winnerSeed, loserSeed) : 0;
+    const bonus = winnerSeed > loserSeed ? calcUpsetBonus(winnerSeed, loserSeed, winnerSeed) : 0;
     const winnerPts = roundPts + bonus;
     let total = 0;
     for (const pid of playerIds) {
@@ -795,7 +798,9 @@ function renderVsPlayer(opponentId) {
                         const s = parseInt(el.dataset.seed) || 0;
                         if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
                     });
-                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+                    // Max possible bonus = underdog wins
+                    const underdog = Math.max(seed1, seed2);
+                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, underdog) : 0;
                     const pts = roundPts + bonus;
                     swingGames++;
                     maxSwingPts += pts;
@@ -934,11 +939,13 @@ function calcSimulatedBoard() {
         if (!gameEl) continue;
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
         let seed1 = 0, seed2 = 0;
+        let simWinnerSeed = 0;
         teamEls.forEach(el => {
             const s = parseInt(el.dataset.seed) || 0;
             if (!seed1) seed1 = s; else seed2 = s;
+            if (parseInt(el.dataset.teamId) === winnerId) simWinnerSeed = s;
         });
-        const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
+        const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, simWinnerSeed) : 0;
         const pts = roundPts + bonus;
 
         // Credit each player who picked this winner
