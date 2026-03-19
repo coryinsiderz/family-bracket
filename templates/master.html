@@ -429,6 +429,9 @@ function applyMyPicks() {
     // Inject projected picks into later rounds
     injectProjectedPicks(VIEWING_USER_ID);
 
+    // Track eliminated teams (lost in any round)
+    const eliminatedTeams = new Set();
+
     // For each game on the master bracket, check if user has a pick
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
@@ -458,8 +461,9 @@ function applyMyPicks() {
                     ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
                     el.appendChild(ptsEl);
                 } else {
-                    // Wrong pick
+                    // Wrong pick — team lost
                     el.classList.add('overlay-wrong');
+                    eliminatedTeams.add(pickTeamId);
                 }
             } else {
                 // Game not yet played - pending pick
@@ -467,6 +471,18 @@ function applyMyPicks() {
             }
         });
     });
+
+    // Cascade strikethroughs: for eliminated teams, mark all their
+    // projected appearances in later rounds as busted
+    if (eliminatedTeams.size > 0) {
+        document.querySelectorAll('.master-projected').forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (eliminatedTeams.has(tid)) {
+                el.classList.remove('overlay-pending');
+                el.classList.add('overlay-wrong');
+            }
+        });
+    }
 
     // Find user rank from board
     const myEntry = BOARD.find(e => e.user_id === VIEWING_USER_ID);

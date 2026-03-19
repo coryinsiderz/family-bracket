@@ -66,9 +66,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ game.team1.seed }}</span>
                             <span class="name">{{ game.team1.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != game.team1.id and game.pick == game.team1.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -122,9 +119,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ game.team2.seed }}</span>
                             <span class="name">{{ game.team2.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != game.team2.id and game.pick == game.team2.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if game.result and game.result.score_team2 is not none %}
                             <span class="score">{{ game.result.score_team2 }}</span>
@@ -166,9 +160,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -217,9 +208,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -267,9 +255,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -324,9 +309,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -371,9 +353,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -418,9 +397,6 @@
                              onclick="pickTeam(this)">
                             <span class="seed">{{ team.seed }}</span>
                             <span class="name">{{ team.name }}</span>
-                            {% if game.result and game.result.winner_id and game.result.winner_id != team.id and game.pick == team.id %}
-                            <span class="actual-winner">{{ state.teams[game.result.winner_id].name }}</span>
-                            {% endif %}
                             {% set live = state.live.get(slot) %}
                             {% if loop.index == 1 and game.result and game.result.score_team1 is not none %}
                             <span class="score">{{ game.result.score_team1 }}</span>
@@ -818,12 +794,6 @@ function renderGameSlot(slot) {
             const showClear = !result && (!isLocked || (phase === 2 && !PHASE2_OPEN && PHASE1_OPEN));
             const clearBtn = showClear ? `<span class="clear-pick" onclick="clearPick(event, '${slot}', ${team.id})">&times;</span>` : '';
 
-            // Actual winner display for wrong picks
-            let actualWinnerHtml = '';
-            if (isWrong && TEAMS_DATA[result.winner_id]) {
-                actualWinnerHtml = `<span class="actual-winner">${TEAMS_DATA[result.winner_id].name}</span>`;
-            }
-
             // Score display
             let scoreHtml = '';
             const scoreKey = i === 0 ? 'score_team1' : 'score_team2';
@@ -843,7 +813,6 @@ function renderGameSlot(slot) {
                           onclick="pickTeam(this)">
                         <span class="seed">${team.seed}</span>
                         <span class="name">${team.name}</span>
-                        ${actualWinnerHtml}
                         ${scoreHtml}
                         ${clearBtn}
                      </div>`;
