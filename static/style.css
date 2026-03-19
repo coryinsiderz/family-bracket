@@ -773,6 +773,11 @@ button:disabled {
 }
 .vs-them.vs-correct .name { font-weight: 700; }
 .vs-them.vs-wrong .name { text-decoration: line-through; opacity: 0.6; }
+.vs-diff {
+    background: rgba(156, 39, 176, 0.2) !important;
+    border-left: 3px solid #9c27b0 !important;
+    opacity: 1 !important;
+}
 .vs-player-label { color: #ffa000; font-weight: 600; }
 
 /* Leverage modal */

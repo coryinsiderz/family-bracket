@@ -324,7 +324,7 @@ function applyOverlay(mode) {
 function clearOverlays() {
     document.querySelectorAll('.master-team').forEach(el => {
         el.classList.remove('overlay-correct', 'overlay-wrong', 'overlay-pending',
-                           'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong',
+                           'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong', 'vs-diff',
                            'lev-high', 'lev-med', 'lev-low',
                            'whatif-sim', 'whatif-simwin');
         const ann = el.querySelector('.overlay-ann');
@@ -503,7 +503,9 @@ function applyMyPicks() {
                         const ptsEl = document.createElement('span');
                         ptsEl.className = 'overlay-pts';
                         ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
-                        el.appendChild(ptsEl);
+                        const scoreEl = el.querySelector('.score');
+                        if (scoreEl) el.insertBefore(ptsEl, scoreEl);
+                        else el.appendChild(ptsEl);
                     }
                 });
             }
@@ -556,7 +558,9 @@ function applyMyPicks() {
                     const ptsEl = document.createElement('span');
                     ptsEl.className = 'overlay-pts';
                     ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
-                    el.appendChild(ptsEl);
+                    const scoreEl = el.querySelector('.score');
+                    if (scoreEl) el.insertBefore(ptsEl, scoreEl);
+                    else el.appendChild(ptsEl);
                 }
             });
         }
@@ -787,7 +791,6 @@ function applyVsPlayer() {
     const controlsEl = document.getElementById('overlay-controls');
     controlsEl.style.display = 'block';
 
-    // Build player dropdown with orange label for compared player
     const otherUsers = USERS.filter(u => u.id !== VIEWING_USER_ID);
     let html = '<label style="margin-right: 8px;">Compare with:</label><select id="vs-player-select" class="vs-player-label">';
     html += '<option value="" style="color: var(--text);">-- Select --</option>';
@@ -795,7 +798,12 @@ function applyVsPlayer() {
         html += `<option value="${u.id}">${u.name}</option>`;
     });
     html += '</select>';
-    html += '<span style="margin-left: 16px; font-size: 11px;"><span style="color: #4285f4;">&#9632;</span> You &nbsp; <span style="color: #ffa000;">&#9632;</span> Them</span>';
+    html += '<span style="margin-left: 16px; font-size: 11px;">';
+    html += '<span style="color: #4285f4;">&#9632;</span> You &nbsp;';
+    html += '<span style="color: #ffa000;">&#9632;</span> Them &nbsp;';
+    html += '<span style="color: #888;">&#9632;</span> Same &nbsp;';
+    html += '<span style="color: #9c27b0;">&#9632;</span> Different';
+    html += '</span>';
     controlsEl.innerHTML = html;
 
     document.getElementById('vs-player-select').addEventListener('change', (e) => {
@@ -806,6 +814,7 @@ function applyVsPlayer() {
 }
 
 function renderVsPlayer(opponentId) {
+    // Show actual results (not user's picks) — inject projected for pending feeders
     injectProjectedPicks(VIEWING_USER_ID);
     const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
     const theirPicks = ALL_PICKS[opponentId] || {};
@@ -818,64 +827,61 @@ function renderVsPlayer(opponentId) {
         const rk = getRoundForSlot(slot);
         if (rk === 'ff' || rk === 'r64') return;
 
-        const myPick = myPicks[slot];
-        const theirPick = theirPicks[slot];
-        if (!myPick && !theirPick) return;
-
+        const feeders = PROGRESSION[slot];
+        if (!feeders) return;
         const result = RESULTS[slot];
         const roundPts = getRoundPoints(slot);
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
-        const samePick = myPick === theirPick;
 
-        if (samePick && myPick) {
-            // Same pick — dim/grey, doesn't matter
-            teamEls.forEach(el => {
-                if (parseInt(el.dataset.teamId) === myPick) {
-                    el.classList.add('overlay-match');
-                }
-            });
-        } else if (myPick || theirPick) {
-            // Different picks (or only one person picked)
-            if (result && result.winner_id) {
-                // Completed game with divergent picks
-                teamEls.forEach(el => {
-                    const tid = parseInt(el.dataset.teamId);
-                    if (tid === myPick) {
-                        el.classList.add('vs-you');
-                        el.classList.add(myPick === result.winner_id ? 'vs-correct' : 'vs-wrong');
-                    }
-                    if (tid === theirPick) {
-                        el.classList.add('vs-them');
-                        el.classList.add(theirPick === result.winner_id ? 'vs-correct' : 'vs-wrong');
-                    }
-                });
-            } else {
-                // Upcoming: swing game
-                if (myPick && theirPick && myPick !== theirPick) {
+        teamEls.forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (!tid) return;
+            const isProjected = el.classList.contains('master-projected');
+
+            // Find which feeder this team came from
+            let feederSlot = null;
+            for (const fSlot of feeders) {
+                const fResult = RESULTS[fSlot];
+                if (fResult && fResult.winner_id === tid) { feederSlot = fSlot; break; }
+            }
+
+            // Get picks for the feeder game
+            const iPicked = feederSlot ? myPicks[feederSlot] === tid : false;
+            const theyPicked = feederSlot ? theirPicks[feederSlot] === tid : false;
+
+            if (isProjected) {
+                // Pending feeder — check if picks differ for this slot
+                const mySlotPick = myPicks[slot];
+                const theirSlotPick = theirPicks[slot];
+                if (mySlotPick && theirSlotPick && mySlotPick !== theirSlotPick) {
+                    // Different picks — purple for swing
+                    el.classList.add('vs-diff');
+                    swingGames++;
+                    // Estimate max points
                     let seed1 = 0, seed2 = 0;
-                    teamEls.forEach(el => {
-                        const s = parseInt(el.dataset.seed) || 0;
-                        if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
+                    teamEls.forEach(te => {
+                        const s = parseInt(te.dataset.seed) || 0;
+                        if (s) { if (!seed1) seed1 = s; else seed2 = s; }
                     });
-                    // Max possible bonus = underdog wins
                     const underdog = Math.max(seed1, seed2);
                     const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, underdog) : 0;
-                    const pts = roundPts + bonus;
-                    swingGames++;
-                    maxSwingPts += pts;
+                    maxSwingPts += roundPts + bonus;
+                } else if (mySlotPick === theirSlotPick && mySlotPick) {
+                    el.classList.add('overlay-match');
                 }
-
-                teamEls.forEach(el => {
-                    const tid = parseInt(el.dataset.teamId);
-                    if (tid === myPick) {
-                        el.classList.add('vs-you');
-                    }
-                    if (tid === theirPick) {
-                        el.classList.add('vs-them');
-                    }
-                });
+                return;
             }
-        }
+
+            // Completed feeder — color by whose pick matches
+            if (iPicked && theyPicked) {
+                el.classList.add('overlay-match'); // grey — both picked, no swing
+            } else if (iPicked && !theyPicked) {
+                el.classList.add('vs-you'); // blue — only you got it
+            } else if (!iPicked && theyPicked) {
+                el.classList.add('vs-them'); // orange — only they got it
+            }
+            // If neither picked this team, no color
+        });
     });
 
     // Summary

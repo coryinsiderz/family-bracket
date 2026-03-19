@@ -1514,8 +1514,13 @@ function bracketCalcUpsetBonus(seed1, seed2, winnerSeed) {
         const ptsEl = document.createElement('span');
         ptsEl.className = 'overlay-pts';
         ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
-        ptsEl.style.marginLeft = '4px';
-        winnerEl.appendChild(ptsEl);
+        // Insert before score element so layout is: seed | name | pts | score
+        const scoreEl = winnerEl.querySelector('.score');
+        if (scoreEl) {
+            winnerEl.insertBefore(ptsEl, scoreEl);
+        } else {
+            winnerEl.appendChild(ptsEl);
+        }
     });
 })();
 </script>
