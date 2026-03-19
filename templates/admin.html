@@ -171,6 +171,12 @@
                 {% endif %}
                 <a href="{{ url_for('admin_bracket_view', user_id=u.id) }}" class="btn-sm" style="font-size: 10px; padding: 2px 6px; text-decoration: none;">View Bracket</a>
                 <a href="{{ url_for('admin_bracket_edit', user_id=u.id) }}" class="btn-sm" style="font-size: 10px; padding: 2px 6px; text-decoration: none; border-color: var(--yellow); color: var(--yellow);">Edit Picks</a>
+                <form method="POST" style="display: inline; margin: 0;" onsubmit="return confirm('Delete {{ u.name }} and all their picks?')">
+                    <input type="hidden" name="action" value="delete_user">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                    <button type="submit" class="btn-sm btn-danger" style="font-size: 10px; padding: 2px 6px;">Delete</button>
+                </form>
             </h3>
             {% if all_picks.get(u.id) %}
             <div style="max-height: 300px; overflow-y: auto;">

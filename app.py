@@ -592,6 +592,16 @@ def admin():
                 db.session.commit()
                 flash(f"Created user '{name}'")
 
+        elif action == "delete_user":
+            user_id = int(request.form.get("user_id"))
+            user = User.query.get(user_id)
+            if user:
+                Pick.query.filter_by(user_id=user.id).delete()
+                name = user.name
+                db.session.delete(user)
+                db.session.commit()
+                flash(f"Deleted user '{name}' and all their picks")
+
     teams = {t.id: t for t in Team.query.all()}
     results = {r.game_slot: r for r in GameResult.query.all()}
     users = User.query.all()
