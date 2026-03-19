@@ -361,32 +361,28 @@ function applyLeverage() {
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
         const roundPts = getRoundPoints(slot);
 
-        if (result && result.winner_id) {
-            // Completed game
-            if (!myPick) return;
-            const bonus = calcUpsetBonus(getSeed(result.team1_id), getSeed(result.team2_id));
-            const pts = roundPts + bonus;
-            const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
-            const fieldAvg = pts * correctCount / totalPlayers;
-            const iCorrect = myPick === result.winner_id;
-            const myPts = iCorrect ? pts : 0;
-            earnedLev += myPts - fieldAvg;
+        // Always make games clickable for field breakdown detail
+        gameEl.style.cursor = 'pointer';
+        gameEl.onclick = () => showLevModal(slot);
 
-            teamEls.forEach(el => {
-                const tid = parseInt(el.dataset.teamId);
-                if (tid !== result.winner_id) return;
-                if (iCorrect) {
-                    el.classList.add('overlay-correct');
-                } else {
-                    el.classList.add('overlay-wrong');
-                }
-            });
-            // Make clickable for detail
-            gameEl.style.cursor = 'pointer';
-            gameEl.onclick = () => showLevModal(slot);
-        } else {
-            // Upcoming game
-            if (!myPick) return;
+        if (result && result.winner_id) {
+            // Completed game — color-code if user had a pick
+            if (myPick) {
+                const bonus = calcUpsetBonus(getSeed(result.team1_id), getSeed(result.team2_id));
+                const pts = roundPts + bonus;
+                const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
+                const fieldAvg = pts * correctCount / totalPlayers;
+                const iCorrect = myPick === result.winner_id;
+                earnedLev += (iCorrect ? pts : 0) - fieldAvg;
+
+                teamEls.forEach(el => {
+                    const tid = parseInt(el.dataset.teamId);
+                    if (tid !== result.winner_id) return;
+                    el.classList.add(iCorrect ? 'overlay-correct' : 'overlay-wrong');
+                });
+            }
+        } else if (myPick) {
+            // Upcoming game with a pick — color-code leverage
             const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
             let seed1 = 0, seed2 = 0;
             teamEls.forEach(el => {
@@ -407,9 +403,6 @@ function applyLeverage() {
                 else if (leverage >= ptsAtStake * 0.2) el.classList.add('lev-med');
                 else el.classList.add('lev-low');
             });
-            // Make clickable for detail
-            gameEl.style.cursor = 'pointer';
-            gameEl.onclick = () => showLevModal(slot);
         }
     });
 
@@ -453,18 +446,17 @@ function showLevModal(slot) {
     const t2Label = team2 ? `(${team2.seed}) ${team2.name}` : 'TBD';
     document.getElementById('lev-modal-header').textContent = `${roundName} — ${t1Label} vs ${t2Label}`;
 
-    // Field breakdown
-    const agrees = [];
-    const disagrees = {};
+    // Field breakdown: group all players by their pick for this slot
+    const pickGroups = {};  // teamId -> [player names]
+    const noPick = [];
     playerIds.forEach(pid => {
         const pick = ALL_PICKS[pid]?.[slot];
         const name = USERS.find(u => u.id === pid)?.name || '?';
-        if (pick === myPick) {
-            agrees.push(name);
-        } else if (pick) {
-            const pickName = TEAMS[pick]?.name || '?';
-            if (!disagrees[pickName]) disagrees[pickName] = [];
-            disagrees[pickName].push(name);
+        if (!pick) {
+            noPick.push(name);
+        } else {
+            if (!pickGroups[pick]) pickGroups[pick] = [];
+            pickGroups[pick].push(name);
         }
     });
 
@@ -475,20 +467,24 @@ function showLevModal(slot) {
     if (myPickName) {
         html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <strong>${myPickName}</strong></div>`;
     } else {
-        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <em>None</em></div>`;
+        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <em>No pick for this game</em></div>`;
     }
 
-    // Agrees
-    html += `<div class="lev-section"><span class="lev-label">Agrees (${agrees.length}/${totalPlayers}):</span> ${agrees.join(', ')}</div>`;
-
-    // Disagrees
-    if (Object.keys(disagrees).length > 0) {
-        html += `<div class="lev-section"><span class="lev-label">Different pick:</span>`;
-        for (const [teamName, names] of Object.entries(disagrees)) {
-            html += ` <span class="lev-diff">${teamName}: ${names.join(', ')}</span>`;
-        }
-        html += `</div>`;
+    // Field breakdown by team
+    html += `<div class="lev-section">`;
+    for (const [teamId, names] of Object.entries(pickGroups)) {
+        const teamName = TEAMS[teamId]?.name || '?';
+        const isMyPick = parseInt(teamId) === myPick;
+        const label = isMyPick ? `<strong>${teamName}</strong>` : teamName;
+        html += `<div class="lev-diff">${label} (${names.length}): ${names.join(', ')}</div>`;
     }
+    if (noPick.length > 0) {
+        html += `<div class="lev-diff" style="color:var(--text-dim)">No pick: ${noPick.join(', ')}</div>`;
+    }
+    html += `</div>`;
+
+    const agrees = myPick ? (pickGroups[myPick] || []) : [];
+    const sameCount = agrees.length;
 
     // Points at stake
     html += `<div class="lev-section"><span class="lev-label">Points at stake:</span> ${roundPts} round`;
@@ -497,7 +493,6 @@ function showLevModal(slot) {
     html += ` = <strong>${ptsAtStake}</strong></div>`;
 
     // Net leverage
-    const sameCount = agrees.length;
     const leverage = ptsAtStake * (1 - sameCount / totalPlayers);
     const levColor = leverage > 0 ? 'var(--green)' : 'var(--text-dim)';
     html += `<div class="lev-section"><span class="lev-label">Net leverage:</span> <strong style="color:${levColor}; font-size: 16px;">${leverage.toFixed(1)}</strong></div>`;
