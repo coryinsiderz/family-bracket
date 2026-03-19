@@ -459,14 +459,20 @@ function applyMyPicks() {
             return;
         }
 
-        // R32+: apply overlay colors
+        // R32+: color each team green if it matches user's pick, red if not.
+        // Only color teams that advanced via a completed feeder game.
+        // Projected picks (feeder pending) get no color.
+        let scored = false;
         teamEls.forEach(el => {
             const tid = parseInt(el.dataset.teamId);
-            if (tid !== pickTeamId) return;
+            if (!tid) return;
+            const isProjected = el.classList.contains('master-projected');
+            if (isProjected) return; // feeder pending — no color
 
-            if (result && result.winner_id) {
-                if (result.winner_id === pickTeamId) {
-                    el.classList.add('overlay-correct');
+            if (tid === pickTeamId) {
+                el.classList.add('overlay-correct');
+                // Score points if this game has a result and user's pick won
+                if (!scored && result && result.winner_id === pickTeamId) {
                     const rp = getRoundPoints(slot);
                     const winnerSeed = getSeed(result.winner_id);
                     const bonus = calcUpsetBonus(result.team1_id ? getSeed(result.team1_id) : 0,
@@ -474,13 +480,14 @@ function applyMyPicks() {
                     const pts = rp + bonus;
                     totalPts += pts;
                     correctCount++;
+                    scored = true;
                     const ptsEl = document.createElement('span');
                     ptsEl.className = 'overlay-pts';
                     ptsEl.textContent = bonus > 0 ? `${rp}+${bonus}` : `${rp}`;
                     el.appendChild(ptsEl);
-                } else {
-                    el.classList.add('overlay-wrong');
                 }
+            } else {
+                el.classList.add('overlay-wrong');
             }
         });
     });
