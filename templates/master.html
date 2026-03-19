@@ -424,9 +424,26 @@ function getSeed(teamId) {
 }
 
 // === LEVERAGE OVERLAY ===
+// Use event delegation so clicks work on projected picks injected later
+let levDelegateActive = false;
+function setupLevDelegation() {
+    if (levDelegateActive) return;
+    levDelegateActive = true;
+    document.getElementById('master-bracket-wrapper').addEventListener('click', (e) => {
+        if (activeMode !== 'leverage') return;
+        const gameEl = e.target.closest('.master-game');
+        if (!gameEl) return;
+        const slot = gameEl.dataset.slot;
+        if (slot && getRoundForSlot(slot) !== 'ff') {
+            showLevModal(slot);
+        }
+    });
+}
+
 function applyLeverage() {
     // Inject projected picks so user sees their bracket path
     injectProjectedPicks(CURRENT_USER_ID);
+    setupLevDelegation();
 
     const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
     const playerIds = Object.keys(ALL_PICKS).map(Number);
@@ -445,9 +462,8 @@ function applyLeverage() {
         const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
         const roundPts = getRoundPoints(slot);
 
-        // Always make games clickable for field breakdown detail
+        // Mark clickable (visual only — delegation handles clicks)
         gameEl.style.cursor = 'pointer';
-        gameEl.onclick = () => showLevModal(slot);
 
         if (result && result.winner_id) {
             // Completed game — color-code if user had a pick
