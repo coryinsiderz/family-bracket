@@ -326,6 +326,7 @@ def master_bracket():
         users=users_list,
         regions=REGIONS,
         rounds=ROUNDS,
+        progression=BRACKET_PROGRESSION,
         now=now_et(),
     )
 

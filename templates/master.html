@@ -174,6 +174,14 @@
         </div>
     </div>
     </div>
+
+    <!-- Leverage detail modal -->
+    <div id="lev-modal" class="lev-modal-overlay" style="display: none;" onclick="if(event.target===this)closeLevModal()">
+        <div class="lev-modal">
+            <div class="lev-modal-header" id="lev-modal-header"></div>
+            <div class="lev-modal-body" id="lev-modal-body"></div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -188,6 +196,29 @@ const BOARD = {{ board | tojson }};
 const CURRENT_USER_ID = {{ user.id }};
 const ROUNDS = {{ rounds | tojson }};
 const USERS = {{ users | tojson(indent=None) }};
+const PROGRESSION = {{ progression | tojson }};
+
+// Build reverse lookup: slot -> {parent, position}
+const FEEDS_INTO = {};
+for (const [parent, [c1, c2]] of Object.entries(PROGRESSION)) {
+    FEEDS_INTO[c1] = { parent, position: 0 };
+    FEEDS_INTO[c2] = { parent, position: 1 };
+}
+
+// Get a user's implied pick for a slot by tracing their bracket forward
+function getUserPickForSlot(userId, slot) {
+    const picks = ALL_PICKS[userId] || {};
+    // Direct pick exists
+    if (picks[slot]) return picks[slot];
+    // For later rounds: trace backward through feeders
+    // A user's implied pick = they picked a team in a feeder that would advance here
+    const feeders = PROGRESSION[slot];
+    if (!feeders) return null;
+    // Check feeder picks: whoever they picked in each feeder, do they also pick them to win the parent?
+    // Actually simpler: user's pick for this slot IS their direct pick record
+    // The Pick model stores explicit picks per slot, not implied
+    return null;
+}
 
 // === TOGGLE LOGIC ===
 let activeMode = 'off';
@@ -316,7 +347,9 @@ function applyLeverage() {
     const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
     const playerIds = Object.keys(ALL_PICKS).map(Number);
     const totalPlayers = playerIds.length;
-    const leverageGames = [];
+    let totalRemainingLev = 0;
+    let remainingGames = 0;
+    let earnedLev = 0;
 
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
@@ -329,79 +362,182 @@ function applyLeverage() {
         const roundPts = getRoundPoints(slot);
 
         if (result && result.winner_id) {
-            // Completed game: show actual points gained vs field
+            // Completed game
             if (!myPick) return;
-            const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
-            const iCorrect = myPick === result.winner_id;
             const bonus = calcUpsetBonus(getSeed(result.team1_id), getSeed(result.team2_id));
             const pts = roundPts + bonus;
+            const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
+            const fieldAvg = pts * correctCount / totalPlayers;
+            const iCorrect = myPick === result.winner_id;
+            const myPts = iCorrect ? pts : 0;
+            earnedLev += myPts - fieldAvg;
 
             teamEls.forEach(el => {
                 const tid = parseInt(el.dataset.teamId);
                 if (tid !== result.winner_id) return;
                 if (iCorrect) {
-                    // I got it right, show how many others missed
-                    const othersWrong = totalPlayers - samePickCount;
-                    if (othersWrong > 0) {
-                        el.classList.add('overlay-correct');
-                        addAnnotation(el, `+${pts} pts, ${othersWrong} missed`);
-                    }
+                    el.classList.add('overlay-correct');
                 } else {
-                    // I got it wrong
-                    const othersRight = samePickCount;
-                    if (othersRight > 0) {
-                        el.classList.add('overlay-wrong');
-                        addAnnotation(el, `-${pts} pts, ${othersRight} gained`);
-                    }
+                    el.classList.add('overlay-wrong');
                 }
             });
+            // Make clickable for detail
+            gameEl.style.cursor = 'pointer';
+            gameEl.onclick = () => showLevModal(slot);
         } else {
-            // Upcoming game: calculate leverage
+            // Upcoming game
             if (!myPick) return;
-            // Count how many picked the same team for this slot
             const samePickCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
-            // Get seeds for upset bonus calc
             let seed1 = 0, seed2 = 0;
             teamEls.forEach(el => {
                 const s = parseInt(el.dataset.seed) || 0;
-                const tid = parseInt(el.dataset.teamId);
-                if (tid) { if (!seed1) seed1 = s; else seed2 = s; }
+                if (parseInt(el.dataset.teamId)) { if (!seed1) seed1 = s; else seed2 = s; }
             });
             const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2) : 0;
             const ptsAtStake = roundPts + bonus;
             const leverage = ptsAtStake * (1 - samePickCount / totalPlayers);
 
-            // Color the picked team
+            totalRemainingLev += leverage;
+            remainingGames++;
+
             teamEls.forEach(el => {
                 const tid = parseInt(el.dataset.teamId);
                 if (tid !== myPick) return;
-                if (leverage >= ptsAtStake * 0.5) {
-                    el.classList.add('lev-high');
-                } else if (leverage >= ptsAtStake * 0.2) {
-                    el.classList.add('lev-med');
-                } else {
-                    el.classList.add('lev-low');
-                }
-                addAnnotation(el, `${samePickCount}/${totalPlayers} agree | ${ptsAtStake} pts | Lev: ${leverage.toFixed(1)}`);
+                if (leverage >= ptsAtStake * 0.5) el.classList.add('lev-high');
+                else if (leverage >= ptsAtStake * 0.2) el.classList.add('lev-med');
+                else el.classList.add('lev-low');
             });
-
-            if (leverage > 0) {
-                const pickName = TEAMS[myPick]?.name || '?';
-                leverageGames.push({ slot, name: pickName, leverage, ptsAtStake, agree: samePickCount });
-            }
+            // Make clickable for detail
+            gameEl.style.cursor = 'pointer';
+            gameEl.onclick = () => showLevModal(slot);
         }
     });
 
-    // Summary: top leverage games
-    leverageGames.sort((a, b) => b.leverage - a.leverage);
-    const top3 = leverageGames.slice(0, 3);
+    // Summary bar
     const summaryEl = document.getElementById('master-summary');
-    if (top3.length > 0) {
-        summaryEl.innerHTML = 'Top leverage: ' +
-            top3.map(g => `<strong>${g.name}</strong> (${g.leverage.toFixed(1)})`).join(', ');
+    const earnedSign = earnedLev >= 0 ? '+' : '';
+    let summaryParts = [];
+    if (remainingGames > 0) summaryParts.push(`<strong>${totalRemainingLev.toFixed(1)}</strong> leverage remaining (${remainingGames} games)`);
+    summaryParts.push(`Earned: <strong>${earnedSign}${earnedLev.toFixed(1)}</strong> vs field`);
+    summaryEl.innerHTML = summaryParts.join(' | ');
+}
+
+function showLevModal(slot) {
+    const myPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    const playerIds = Object.keys(ALL_PICKS).map(Number);
+    const totalPlayers = playerIds.length;
+    const myPick = myPicks[slot];
+    const result = RESULTS[slot];
+    const roundPts = getRoundPoints(slot);
+    const rk = getRoundForSlot(slot);
+    const roundName = ROUNDS[rk]?.name || rk;
+
+    // Get teams from DOM
+    const gameEl = document.getElementById('mgame-' + slot);
+    if (!gameEl) return;
+    const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
+    const teams = [];
+    teamEls.forEach(el => {
+        const tid = parseInt(el.dataset.teamId);
+        if (tid) teams.push({ id: tid, name: el.dataset.name, seed: parseInt(el.dataset.seed) || 0 });
+    });
+
+    const team1 = teams[0];
+    const team2 = teams[1];
+    const hasBothTeams = team1 && team2;
+    const bonus = hasBothTeams ? calcUpsetBonus(team1.seed, team2.seed) : 0;
+    const ptsAtStake = roundPts + bonus;
+
+    // Header
+    const t1Label = team1 ? `(${team1.seed}) ${team1.name}` : 'TBD';
+    const t2Label = team2 ? `(${team2.seed}) ${team2.name}` : 'TBD';
+    document.getElementById('lev-modal-header').textContent = `${roundName} — ${t1Label} vs ${t2Label}`;
+
+    // Field breakdown
+    const agrees = [];
+    const disagrees = {};
+    playerIds.forEach(pid => {
+        const pick = ALL_PICKS[pid]?.[slot];
+        const name = USERS.find(u => u.id === pid)?.name || '?';
+        if (pick === myPick) {
+            agrees.push(name);
+        } else if (pick) {
+            const pickName = TEAMS[pick]?.name || '?';
+            if (!disagrees[pickName]) disagrees[pickName] = [];
+            disagrees[pickName].push(name);
+        }
+    });
+
+    let html = '';
+
+    // Your pick
+    const myPickName = myPick ? TEAMS[myPick]?.name : null;
+    if (myPickName) {
+        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <strong>${myPickName}</strong></div>`;
     } else {
-        summaryEl.textContent = 'No upcoming leverage games';
+        html += `<div class="lev-section"><span class="lev-label">Your pick:</span> <em>None</em></div>`;
     }
+
+    // Agrees
+    html += `<div class="lev-section"><span class="lev-label">Agrees (${agrees.length}/${totalPlayers}):</span> ${agrees.join(', ')}</div>`;
+
+    // Disagrees
+    if (Object.keys(disagrees).length > 0) {
+        html += `<div class="lev-section"><span class="lev-label">Different pick:</span>`;
+        for (const [teamName, names] of Object.entries(disagrees)) {
+            html += ` <span class="lev-diff">${teamName}: ${names.join(', ')}</span>`;
+        }
+        html += `</div>`;
+    }
+
+    // Points at stake
+    html += `<div class="lev-section"><span class="lev-label">Points at stake:</span> ${roundPts} round`;
+    if (bonus > 0) html += ` + ${bonus} upset bonus`;
+    else if (!hasBothTeams) html += ` (upset bonus TBD)`;
+    html += ` = <strong>${ptsAtStake}</strong></div>`;
+
+    // Net leverage
+    const sameCount = agrees.length;
+    const leverage = ptsAtStake * (1 - sameCount / totalPlayers);
+    const levColor = leverage > 0 ? 'var(--green)' : 'var(--text-dim)';
+    html += `<div class="lev-section"><span class="lev-label">Net leverage:</span> <strong style="color:${levColor}; font-size: 16px;">${leverage.toFixed(1)}</strong></div>`;
+
+    // Outcome projections / completed result
+    if (result && result.winner_id) {
+        const winnerName = TEAMS[result.winner_id]?.name || '?';
+        const iCorrect = myPick === result.winner_id;
+        const correctCount = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === result.winner_id).length;
+        const fieldAvg = (ptsAtStake * correctCount / totalPlayers).toFixed(1);
+        const myPts = iCorrect ? ptsAtStake : 0;
+        const net = (myPts - parseFloat(fieldAvg)).toFixed(1);
+        const netSign = parseFloat(net) >= 0 ? '+' : '';
+        const netColor = parseFloat(net) >= 0 ? 'var(--green)' : 'var(--red)';
+        html += `<div class="lev-section lev-result">`;
+        html += `<span class="lev-label">Result:</span> <strong>${winnerName}</strong> won<br>`;
+        html += `You: <strong>${iCorrect ? '+' + ptsAtStake : '0'}</strong> | Field avg: +${fieldAvg} | Net: <strong style="color:${netColor}">${netSign}${net}</strong>`;
+        html += `</div>`;
+    } else if (myPick && hasBothTeams) {
+        const otherTeam = team1.id === myPick ? team2 : team1;
+        // If your pick wins
+        const correctIfWin = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === myPick).length;
+        const fieldAvgIfWin = (ptsAtStake * correctIfWin / totalPlayers).toFixed(1);
+        const netIfWin = (ptsAtStake - parseFloat(fieldAvgIfWin)).toFixed(1);
+        // If other team wins
+        const correctIfLose = playerIds.filter(pid => ALL_PICKS[pid]?.[slot] === otherTeam.id).length;
+        const fieldAvgIfLose = (ptsAtStake * correctIfLose / totalPlayers).toFixed(1);
+        const netIfLose = (0 - parseFloat(fieldAvgIfLose)).toFixed(1);
+        html += `<div class="lev-section">`;
+        html += `If <strong>${TEAMS[myPick]?.name}</strong> wins: You +${ptsAtStake}, field avg +${fieldAvgIfWin}. Net: <strong style="color:var(--green)">+${netIfWin}</strong><br>`;
+        html += `If <strong>${otherTeam.name}</strong> wins: You +0, field avg +${fieldAvgIfLose}. Net: <strong style="color:var(--red)">${netIfLose}</strong>`;
+        html += `</div>`;
+    }
+
+    document.getElementById('lev-modal-body').innerHTML = html;
+    document.getElementById('lev-modal').style.display = 'flex';
+}
+
+function closeLevModal() {
+    document.getElementById('lev-modal').style.display = 'none';
 }
 
 function addAnnotation(el, text) {

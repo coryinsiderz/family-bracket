@@ -764,6 +764,51 @@ button:disabled {
     opacity: 1 !important;
 }
 
+/* Leverage modal */
+.lev-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.lev-modal {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.lev-modal-header {
+    padding: 12px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-bright);
+}
+.lev-modal-body { padding: 12px 16px; }
+.lev-section {
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.lev-label { color: var(--text-dim); }
+.lev-diff { display: inline-block; margin-right: 12px; }
+.lev-result {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    margin-top: 8px;
+}
+@media (max-width: 500px) {
+    .lev-modal-overlay { align-items: flex-end; padding: 0; }
+    .lev-modal { border-radius: 12px 12px 0 0; max-height: 70vh; }
+}
+
 /* What If classes */
 .whatif-simwin {
     background: rgba(74, 158, 255, 0.2) !important;
