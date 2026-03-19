@@ -171,6 +171,14 @@
                 {% endif %}
                 <a href="{{ url_for('admin_bracket_view', user_id=u.id) }}" class="btn-sm" style="font-size: 10px; padding: 2px 6px; text-decoration: none;">View Bracket</a>
                 <a href="{{ url_for('admin_bracket_edit', user_id=u.id) }}" class="btn-sm" style="font-size: 10px; padding: 2px 6px; text-decoration: none; border-color: var(--yellow); color: var(--yellow);">Edit Picks</a>
+                <button type="button" class="btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">Reset PW</button>
+                <form method="POST" style="display: none; align-items: center; gap: 4px; margin: 0;">
+                    <input type="hidden" name="action" value="reset_password">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <input type="hidden" name="pw" value="{{ session.get('admin_pw', '') }}">
+                    <input type="password" name="new_password" placeholder="New password" required minlength="4" style="font-size: 10px; padding: 2px 6px; width: 100px;">
+                    <button type="submit" class="btn-sm" style="font-size: 10px; padding: 2px 6px; border-color: var(--green); color: var(--green);">Save</button>
+                </form>
                 <form method="POST" style="display: inline; margin: 0;" onsubmit="return confirm('Delete {{ u.name }} and all their picks?')">
                     <input type="hidden" name="action" value="delete_user">
                     <input type="hidden" name="user_id" value="{{ u.id }}">

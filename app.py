@@ -618,6 +618,19 @@ def admin():
                 db.session.commit()
                 flash(f"Created user '{name}'")
 
+        elif action == "reset_password":
+            user_id = int(request.form.get("user_id"))
+            new_pw = request.form.get("new_password", "").strip()
+            user = User.query.get(user_id)
+            if user and new_pw and len(new_pw) >= 4:
+                user.set_password(new_pw)
+                db.session.commit()
+                flash(f"Password reset for '{user.name}'")
+            elif new_pw and len(new_pw) < 4:
+                flash("Password must be at least 4 characters.")
+            else:
+                flash("Password is required.")
+
         elif action == "delete_user":
             user_id = int(request.form.get("user_id"))
             user = User.query.get(user_id)
