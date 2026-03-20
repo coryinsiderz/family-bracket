@@ -12,10 +12,7 @@
     <nav>
         <div class="left">
             <span class="title">Baltz Bracket</span>
-            {% if session.get('user_id') %}
-            <a href="{{ url_for('bracket') }}" class="{{ 'active' if request.endpoint == 'bracket' }}">Bracket</a>
-            {% endif %}
-            <a href="{{ url_for('master_bracket') }}" class="{{ 'active' if request.endpoint == 'master_bracket' }}">Master</a>
+            <a href="{{ url_for('master_bracket') }}" class="{{ 'active' if request.endpoint == 'master_bracket' }}">Bracket</a>
             <a href="{{ url_for('leaderboard') }}" class="{{ 'active' if request.endpoint == 'leaderboard' }}">Leaderboard</a>
         </div>
         <div class="right">

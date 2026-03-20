@@ -272,7 +272,7 @@ def login():
 
             session["user_id"] = user.id
             session.pop("guest", None)
-            return redirect(url_for("bracket"))
+            return redirect(url_for("master_bracket"))
 
         if action == "login":
             name = request.form.get("name", "").strip().lower()
@@ -285,7 +285,7 @@ def login():
 
             session["user_id"] = user.id
             session.pop("guest", None)
-            return redirect(url_for("bracket"))
+            return redirect(url_for("master_bracket"))
 
     unclaimed = User.query.filter_by(password_hash="").all()
     return render_template("login.html", unclaimed=unclaimed)
@@ -303,37 +303,11 @@ def logout():
 @app.route("/")
 def index():
     if "user_id" in session:
-        return redirect(url_for("bracket"))
+        return redirect(url_for("master_bracket"))
     if session.get("guest"):
         return redirect(url_for("master_bracket"))
     return redirect(url_for("login"))
 
-
-@app.route("/bracket")
-@login_required
-def bracket():
-    if is_guest():
-        return redirect(url_for("master_bracket"))
-    user = get_current_user()
-    pick_count = Pick.query.filter_by(user_id=user.id).count()
-    app.logger.info(f"[BRACKET LOAD] user={user.name} (id={user.id}), picks_in_db={pick_count}, session_user_id={session.get('user_id')}")
-    state = build_bracket_state(user.id)
-    alive_teams = get_alive_teams() if phase2_open() else {}
-
-    return render_template(
-        "bracket.html",
-        user=user,
-        state=state,
-        phase1_open=phase1_open(),
-        phase2_open=phase2_open(),
-        phase1_lock=PHASE1_LOCK,
-        phase2_unlock=PHASE2_UNLOCK,
-        phase2_lock=PHASE2_LOCK,
-        alive_team_ids=list(alive_teams.keys()),
-        regions=REGIONS,
-        rounds=ROUNDS,
-        now=now_et(),
-    )
 
 
 @app.route("/master")
