@@ -737,23 +737,6 @@ button:disabled {
     pointer-events: none;
 }
 
-/* Leverage classes */
-.lev-high {
-    background: rgba(76, 175, 80, 0.25) !important;
-    border-left: 3px solid var(--green) !important;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
-    opacity: 1 !important;
-}
-.lev-med {
-    background: rgba(255, 179, 0, 0.15) !important;
-    border-left: 3px solid var(--yellow) !important;
-    opacity: 1 !important;
-}
-.lev-low {
-    opacity: 0.5 !important;
-    border-left: 3px solid var(--border) !important;
-}
-
 /* vs Player classes */
 .overlay-match {
     opacity: 1 !important;
