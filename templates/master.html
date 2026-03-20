@@ -539,20 +539,19 @@ function applyMyPicks() {
                 el.querySelector('.name').style.fontWeight = '700';
             }
 
-            // Check feeder result to determine status
-            const feederResult = feederSlot ? RESULTS[feederSlot] : null;
-
-            if (!feederResult || !feederResult.winner_id) {
-                // Feeder game pending — no color
+            // Check if team is eliminated (from ANY round, not just feeder)
+            if (eliminated.has(tid)) {
+                el.classList.add('overlay-wrong');
                 return;
             }
 
-            // Feeder game is complete
-            if (eliminated.has(tid)) {
-                el.classList.add('overlay-wrong');
-            } else {
+            // Check feeder result to determine alive vs pending
+            const feederResult = feederSlot ? RESULTS[feederSlot] : null;
+            if (feederResult && feederResult.winner_id) {
+                // Feeder game complete and team is alive
                 el.classList.add('overlay-correct');
             }
+            // else: feeder pending — no color (just plain text)
         });
 
         // Point annotation: if THIS game has a result and user's winner pick won
@@ -812,10 +811,10 @@ function applyVsPlayer() {
     });
     html += '</select>';
     html += '<span style="margin-left: 16px; font-size: 11px;">';
-    html += '<span style="color: #4285f4;">&#9632;</span> You &nbsp;';
-    html += '<span style="color: #ffa000;">&#9632;</span> Them &nbsp;';
     html += '<span style="color: #4682b4;">&#9632;</span> Same &nbsp;';
-    html += '<span style="color: #9c27b0;">&#9632;</span> Different';
+    html += '<span style="color: var(--green);">&#9632;</span> You right &nbsp;';
+    html += '<span style="color: #ffa000;">&#9632;</span> You wrong &nbsp;';
+    html += '<span style="color: #9c27b0;">&#9632;</span> Swing';
     html += '</span>';
     controlsEl.innerHTML = html;
 
@@ -827,11 +826,11 @@ function applyVsPlayer() {
 }
 
 function renderVsPlayer(opponentId) {
-    // Show actual results (not user's picks) — inject projected for pending feeders
-    injectProjectedPicks(VIEWING_USER_ID);
-    markEliminatedProjections();
-    const myPicks = ALL_PICKS[VIEWING_USER_ID] || {};
+    // Show YOUR picks in every R32+ slot, colored by agreement/outcome vs opponent
+    injectUserBracket(VIEWING_USER_ID);
+    const picks = ALL_PICKS[VIEWING_USER_ID] || {};
     const theirPicks = ALL_PICKS[opponentId] || {};
+    const eliminated = getEliminatedTeams();
     const opponentName = USERS.find(u => u.id === opponentId)?.name || '?';
     let swingGames = 0;
     let maxSwingPts = 0;
@@ -843,82 +842,48 @@ function renderVsPlayer(opponentId) {
 
         const feeders = PROGRESSION[slot];
         if (!feeders) return;
-        const result = RESULTS[slot];
         const roundPts = getRoundPoints(slot);
-        const teamEls = gameEl.querySelectorAll('.master-team[data-team-id]');
 
-        teamEls.forEach(el => {
+        gameEl.querySelectorAll('.master-projected').forEach(el => {
             const tid = parseInt(el.dataset.teamId);
             if (!tid) return;
-            const isProjected = el.classList.contains('master-projected');
+            const feederSlot = el.dataset.feederSlot;
+            if (!feederSlot) return;
 
-            // Find which feeder this team came from
-            let feederSlot = null;
-            for (const fSlot of feeders) {
-                const fResult = RESULTS[fSlot];
-                if (fResult && fResult.winner_id === tid) { feederSlot = fSlot; break; }
+            const theyPickedSame = theirPicks[feederSlot] === tid;
+            const feederResult = RESULTS[feederSlot];
+            const isEliminated = eliminated.has(tid);
+
+            // Bold the user's winner pick for this game
+            if (tid === picks[slot]) {
+                el.querySelector('.name').style.fontWeight = '700';
             }
 
-            // Get picks for the feeder game
-            const iPicked = feederSlot ? myPicks[feederSlot] === tid : false;
-            const theyPicked = feederSlot ? theirPicks[feederSlot] === tid : false;
-
-            if (isProjected) {
-                // Projected team — compare feeder picks
-                const projFeeder = el.dataset.feederSlot;
-                if (projFeeder) {
-                    const iPickedThis = myPicks[projFeeder] === tid;
-                    const theyPickedThis = theirPicks[projFeeder] === tid;
-                    if (iPickedThis && theyPickedThis) {
-                        el.classList.add('overlay-match'); // teal — both picked same
-                    } else if (iPickedThis && !theyPickedThis) {
-                        el.classList.add('vs-you'); // blue — only me
-                    } else if (!iPickedThis && theyPickedThis) {
-                        el.classList.add('vs-them'); // orange — only them
-                    } else {
-                        // Neither picked this specific team for this feeder
-                        // Check if picks differ for the feeder slot
-                        const myFeederPick = myPicks[projFeeder];
-                        const theirFeederPick = theirPicks[projFeeder];
-                        if (myFeederPick && theirFeederPick && myFeederPick !== theirFeederPick) {
-                            el.classList.add('vs-diff'); // purple — different picks
-                        }
-                    }
+            if (feederResult && feederResult.winner_id) {
+                // RESOLVED: feeder game completed
+                if (theyPickedSame) {
+                    // Teal: both picked same team
+                    el.classList.add('overlay-match');
+                    if (isEliminated) el.classList.add('pick-eliminated');
+                } else if (!isEliminated) {
+                    // Green: your pick was RIGHT, they picked differently
+                    el.classList.add('overlay-correct');
+                } else {
+                    // Orange: your pick was WRONG, they picked differently (they likely got it)
+                    el.classList.add('vs-them');
+                    el.classList.add('pick-eliminated');
                 }
-                return;
-            }
-
-            // Completed feeder — color by whose pick matches
-            if (iPicked && theyPicked) {
-                el.classList.add('overlay-match'); // grey — both picked, no swing
-            } else if (iPicked && !theyPicked) {
-                el.classList.add('vs-you'); // blue — only you got it
-            } else if (!iPicked && theyPicked) {
-                el.classList.add('vs-them'); // orange — only they got it
-            }
-            // If neither picked this team, no color
-        });
-
-        // Count swing games: pending feeders where picks differ
-        if (!result || !result.winner_id) {
-            for (const fSlot of feeders) {
-                if (RESULTS[fSlot] && RESULTS[fSlot].winner_id) continue; // feeder resolved
-                const myF = myPicks[fSlot];
-                const theirF = theirPicks[fSlot];
-                if (myF && theirF && myF !== theirF) {
+            } else {
+                // PENDING: feeder game not played yet
+                if (theyPickedSame) {
+                    el.classList.add('overlay-match'); // teal: both agree
+                } else {
+                    el.classList.add('vs-diff'); // purple: different picks (swing)
                     swingGames++;
-                    let seed1 = 0, seed2 = 0;
-                    teamEls.forEach(te => {
-                        const s = parseInt(te.dataset.seed) || 0;
-                        if (s) { if (!seed1) seed1 = s; else seed2 = s; }
-                    });
-                    const underdog = Math.max(seed1, seed2);
-                    const bonus = (seed1 && seed2) ? calcUpsetBonus(seed1, seed2, underdog) : 0;
-                    maxSwingPts += roundPts + bonus;
-                    break; // count once per game slot
+                    maxSwingPts += roundPts; // approximate
                 }
             }
-        }
+        });
     });
 
     // Summary
