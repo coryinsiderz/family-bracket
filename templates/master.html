@@ -945,11 +945,12 @@ function applyLeverage() {
     // Summary bar
     const summaryEl = document.getElementById('master-summary');
     const earnedSign = earnedLev >= 0 ? '+' : '';
-    let parts = [];
-    if (remainingGames > 0) parts.push(`Leverage remaining: <strong>${totalRemainingGain.toFixed(1)}</strong> pts across ${remainingGames} games`);
-    parts.push(`Earned: <strong>${earnedSign}${earnedLev.toFixed(1)}</strong> vs field`);
-    summaryEl.innerHTML = parts.join(' | ')
-        + `<br><span style="color:var(--text-dim); font-size:11px;">Brighter = higher stakes. Green = you gained, Red = you lost, White = upcoming. Click any team for details.</span>`;
+    let lines = [];
+    lines.push(`<span style="color:var(--text-dim); font-size:12px;">Click any team for details</span>`);
+    lines.push(`<strong style="font-size:13px;">Leverage Remaining</strong>`);
+    if (remainingGames > 0) lines.push(`${totalRemainingGain.toFixed(1)} pts across ${remainingGames} games`);
+    lines.push(`Earned: ${earnedSign}${earnedLev.toFixed(1)} vs field`);
+    summaryEl.innerHTML = lines.join('<br>');
 }
 
 // Render one feeder game section for the leverage modal.
