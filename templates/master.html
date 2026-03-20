@@ -539,19 +539,37 @@ function applyMyPicks() {
                 el.querySelector('.name').style.fontWeight = '700';
             }
 
-            // Check if team is eliminated (from ANY round, not just feeder)
-            if (eliminated.has(tid)) {
-                el.classList.add('overlay-wrong');
-                return;
-            }
-
-            // Check feeder result to determine alive vs pending
             const feederResult = feederSlot ? RESULTS[feederSlot] : null;
+            const isElim = eliminated.has(tid);
+
             if (feederResult && feederResult.winner_id) {
-                // Feeder game complete and team is alive
-                el.classList.add('overlay-correct');
+                // Feeder game has been played
+                if (feederResult.winner_id === tid) {
+                    // Team won its feeder — check if current game has a result
+                    const slotResult = RESULTS[slot];
+                    if (slotResult && slotResult.winner_id) {
+                        // Current game played
+                        if (slotResult.winner_id === tid) {
+                            el.classList.add('overlay-correct'); // won this round too
+                        } else {
+                            el.classList.add('overlay-wrong'); // lost in THIS round
+                        }
+                    } else {
+                        // Current game not played yet — team is alive
+                        el.classList.add('overlay-correct');
+                    }
+                } else {
+                    // Team lost its feeder game — red + strikethrough
+                    el.classList.add('overlay-wrong');
+                }
+            } else {
+                // Feeder game NOT played yet
+                if (isElim) {
+                    // Team eliminated in an earlier round — strikethrough only, no red
+                    el.classList.add('pick-eliminated');
+                }
+                // else: pending, no color
             }
-            // else: feeder pending — no color (just plain text)
         });
 
         // Point annotation: if THIS game has a result and user's winner pick won
@@ -875,7 +893,10 @@ function renderVsPlayer(opponentId) {
                 }
             } else {
                 // PENDING: feeder game not played yet
-                if (theyPickedSame) {
+                if (isEliminated) {
+                    // Team eliminated in earlier round — strikethrough only
+                    el.classList.add('pick-eliminated');
+                } else if (theyPickedSame) {
                     el.classList.add('overlay-match'); // teal: both agree
                 } else {
                     el.classList.add('vs-diff'); // purple: different picks (swing)
