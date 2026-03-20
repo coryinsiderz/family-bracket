@@ -370,6 +370,13 @@ function clearOverlays() {
         el.classList.remove('master-tbd-hidden');
         el.style.display = '';
     });
+    // Remove cloned opponent bracket
+    removeOpponentBracket();
+}
+
+function removeOpponentBracket() {
+    document.getElementById('vs-opponent-header')?.remove();
+    document.getElementById('vs-opponent-bracket')?.remove();
 }
 
 // Inject the user's projected picks into TBD slots.
@@ -477,7 +484,9 @@ function getEliminatedTeams() {
 
 // Inject the user's picks into R32+ slots, REPLACING actual results.
 // Shows the user's projected bracket, not ground truth.
-function injectUserBracket(userId) {
+// prefix: element ID prefix, defaults to 'mgame-'. Use 'mgame-opp-' for cloned brackets.
+function injectUserBracket(userId, prefix) {
+    prefix = prefix || 'mgame-';
     const picks = ALL_PICKS[userId] || {};
     const slotOrder = [];
     const regions = ['east', 'west', 'midwest', 'south'];
@@ -489,7 +498,7 @@ function injectUserBracket(userId) {
     for (const slot of slotOrder) {
         const feeders = PROGRESSION[slot];
         if (!feeders) continue;
-        const gameEl = document.getElementById('mgame-' + slot);
+        const gameEl = document.getElementById(prefix + slot);
         if (!gameEl) continue;
 
         // Hide ALL existing team elements and TBDs in this slot
@@ -648,6 +657,58 @@ function applyMyPicks() {
 function getSeed(teamId) {
     const t = TEAMS[teamId];
     return t ? t.seed : 0;
+}
+
+// Apply My Picks coloring to a bracket with the given ID prefix.
+// Used for both the main bracket and cloned opponent brackets.
+function applyMyPicksTo(userId, prefix) {
+    prefix = prefix || 'mgame-';
+    const picks = ALL_PICKS[userId] || {};
+    const eliminated = getEliminatedTeams();
+
+    const slotOrder = [];
+    const regions = ['east', 'west', 'midwest', 'south'];
+    for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
+    for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
+    for (const r of regions) slotOrder.push(`${r}_e8_1`);
+    slotOrder.push('f4_1', 'f4_2', 'championship');
+
+    for (const slot of slotOrder) {
+        const gameEl = document.getElementById(prefix + slot);
+        if (!gameEl) continue;
+        const winnerPick = picks[slot];
+
+        gameEl.querySelectorAll('.master-projected').forEach(el => {
+            const tid = parseInt(el.dataset.teamId);
+            if (!tid) return;
+            const feederSlot = el.dataset.feederSlot;
+
+            // Bold the winner pick
+            if (tid === winnerPick) {
+                el.querySelector('.name').style.fontWeight = '700';
+            }
+
+            const feederResult = feederSlot ? RESULTS[feederSlot] : null;
+            const isElim = eliminated.has(tid);
+
+            if (feederResult && feederResult.winner_id) {
+                if (feederResult.winner_id === tid) {
+                    const slotResult = RESULTS[slot];
+                    if (slotResult && slotResult.winner_id) {
+                        el.classList.add(slotResult.winner_id === tid ? 'overlay-correct' : 'overlay-wrong');
+                    } else {
+                        el.classList.add('overlay-correct');
+                    }
+                } else {
+                    el.classList.add('overlay-wrong');
+                }
+            } else {
+                if (isElim) {
+                    el.classList.add('pick-eliminated');
+                }
+            }
+        });
+    }
 }
 
 // === LEVERAGE OVERLAY ===
@@ -958,6 +1019,32 @@ function renderVsPlayer(opponentId) {
     const diffStr = diff > 0 ? `${diff} pts ahead` : diff < 0 ? `${Math.abs(diff)} pts back` : 'tied';
     document.getElementById('master-summary').innerHTML =
         `<span style="color: #4285f4;">You: <strong>${myTotal}</strong></span> | <span class="vs-player-label">${opponentName}: <strong>${theirTotal}</strong></span> | ${diffStr} | <strong>${swingGames}</strong> swing games (up to ${maxSwingPts} pts)`;
+
+    // Clone bracket to show opponent's picks below
+    removeOpponentBracket();
+
+    const wrapper = document.getElementById('master-bracket-wrapper');
+    const clone = wrapper.cloneNode(true);
+    clone.id = 'vs-opponent-bracket';
+
+    // Re-prefix all IDs in the clone: mgame- → mgame-opp-
+    clone.querySelectorAll('[id]').forEach(el => {
+        el.id = el.id.replace(/^mgame-/, 'mgame-opp-');
+    });
+
+    // Add header
+    const header = document.createElement('div');
+    header.id = 'vs-opponent-header';
+    header.className = 'region-header';
+    header.style.cssText = 'margin-top: 32px; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 16px;';
+    header.innerHTML = `<span class="vs-player-label">${opponentName}</span>'s Bracket`;
+
+    wrapper.parentNode.insertBefore(header, wrapper.nextSibling);
+    wrapper.parentNode.insertBefore(clone, header.nextSibling);
+
+    // Inject opponent's picks into clone and apply My Picks coloring
+    injectUserBracket(opponentId, 'mgame-opp-');
+    applyMyPicksTo(opponentId, 'mgame-opp-');
 }
 
 // === WHAT IF OVERLAY ===
