@@ -326,6 +326,7 @@ def master_bracket():
         }
     board = calculate_leaderboard()
     users_list = [{"id": u.id, "name": u.name} for u in users]
+    alive_teams = get_alive_teams() if phase2_open() else {}
     return render_template(
         "master.html",
         user=user,
@@ -338,6 +339,8 @@ def master_bracket():
         progression=BRACKET_PROGRESSION,
         now=now_et(),
         is_guest=guest,
+        phase2_open=phase2_open(),
+        alive_team_ids=list(alive_teams.keys()),
     )
 
 

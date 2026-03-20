@@ -194,6 +194,17 @@
         </div>
     </div>
 </div>
+
+<!-- Phase 2 save bar (My Picks editing) -->
+{% if not is_guest and phase2_open %}
+<div class="save-bar" id="master-save-bar" style="display: none;">
+    <span class="status" id="master-save-status"></span>
+    <div class="flex gap-8">
+        <button onclick="savePicksMaster()" id="master-save-btn">Save Rest of the Way</button>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -210,6 +221,18 @@ let VIEWING_USER_ID = CURRENT_USER_ID; // Who we're viewing picks for (changeabl
 const ROUNDS = {{ rounds | tojson }};
 const USERS = {{ users | tojson(indent=None) }};
 const PROGRESSION = {{ progression | tojson }};
+const PHASE2_OPEN = {{ 'true' if phase2_open else 'false' }};
+const ALIVE_TEAM_IDS = new Set({{ alive_team_ids | tojson }});
+
+// Mutable picks state for phase 2 editing
+let editPicks = {};      // slot -> { id, name, seed }
+let pendingPicks = {};   // slot -> teamId or null
+let hasChanges = false;
+
+function phaseForSlot(slot) {
+    if (slot.startsWith('ff_') || slot.includes('_r64_') || slot.includes('_r32_')) return 1;
+    return 2;
+}
 
 // Build reverse lookup: slot -> {parent, position}
 const FEEDS_INTO = {};
@@ -293,6 +316,9 @@ function applyOverlay(mode) {
     // Clear all overlays first
     clearOverlays();
 
+    // Hide save bar when not in My Picks mode
+    if (mode !== 'picks') hideSaveBarMaster();
+
     const summaryEl = document.getElementById('master-summary');
     const controlsEl = document.getElementById('overlay-controls');
     summaryEl.textContent = '';
@@ -315,7 +341,12 @@ function applyOverlay(mode) {
         return;
     }
     document.getElementById('master-bracket-wrapper').style.display = '';
-    if (mode === 'picks') applyMyPicks();
+    if (mode === 'picks') {
+        if (PHASE2_OPEN && !IS_GUEST && VIEWING_USER_ID === CURRENT_USER_ID) {
+            initEditPicks();
+        }
+        applyMyPicks();
+    }
     if (mode === 'leverage') applyLeverage();
     if (mode === 'vs') applyVsPlayer();
     if (mode === 'whatif') applyWhatIf();
@@ -480,6 +511,17 @@ function injectUserBracket(userId) {
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
             proj.dataset.feederSlot = feederSlot;
+            // Make S16+ clickable when phase 2 is open and viewing own picks
+            const isEditable = PHASE2_OPEN && !IS_GUEST && userId === CURRENT_USER_ID && phaseForSlot(slot) === 2;
+            if (isEditable) {
+                proj.dataset.phase = '2';
+                proj.style.cursor = 'pointer';
+                proj.onclick = function() { pickTeamMaster(this); };
+                // Mark as picked if this is the user's winner pick for this slot
+                if (editPicks[slot] && editPicks[slot].id === feederPick) {
+                    proj.classList.add('picked');
+                }
+            }
             proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
             gameEl.appendChild(proj);
         }
@@ -1136,6 +1178,151 @@ function applyExposure() {
 
     controlsEl.innerHTML = html;
     document.getElementById('master-summary').textContent = `Field exposure across ${totalPlayers} entries`;
+}
+
+// === PHASE 2 PICK EDITING (My Picks toggle) ===
+
+function initEditPicks() {
+    // Populate editPicks from user's existing picks (phase 2 only)
+    editPicks = {};
+    pendingPicks = {};
+    hasChanges = false;
+    const userPicks = ALL_PICKS[CURRENT_USER_ID] || {};
+    for (const [slot, teamId] of Object.entries(userPicks)) {
+        if (phaseForSlot(slot) === 2) {
+            const team = TEAMS[teamId];
+            if (team) {
+                editPicks[slot] = { id: teamId, name: team.name, seed: team.seed };
+            }
+        }
+    }
+}
+
+function pickTeamMaster(el) {
+    const slot = el.dataset.slot;
+    const teamId = parseInt(el.dataset.teamId);
+
+    if (!PHASE2_OPEN) return;
+    if (IS_GUEST) return;
+    if (phaseForSlot(slot) !== 2) return;
+    if (ALIVE_TEAM_IDS.size > 0 && !ALIVE_TEAM_IDS.has(teamId)) return;
+
+    const oldPick = editPicks[slot];
+
+    // If clicking the already-picked team, unpick it
+    if (oldPick && oldPick.id === teamId) {
+        delete editPicks[slot];
+        pendingPicks[slot] = null;
+        hasChanges = true;
+        if (oldPick) cascadeClearMaster(slot, oldPick.id);
+        refreshMyPicks();
+        showSaveBarMaster();
+        return;
+    }
+
+    // Set new pick
+    const team = { id: teamId, name: el.dataset.name, seed: el.dataset.seed };
+    editPicks[slot] = team;
+    pendingPicks[slot] = teamId;
+    hasChanges = true;
+
+    // Also update ALL_PICKS so overlay re-render sees the change
+    if (!ALL_PICKS[CURRENT_USER_ID]) ALL_PICKS[CURRENT_USER_ID] = {};
+    ALL_PICKS[CURRENT_USER_ID][slot] = teamId;
+
+    // Cascade-clear downstream if pick changed
+    if (oldPick && oldPick.id !== teamId) {
+        cascadeClearMaster(slot, oldPick.id);
+    }
+
+    refreshMyPicks();
+    showSaveBarMaster();
+}
+
+function cascadeClearMaster(slot, oldTeamId) {
+    const feed = FEEDS_INTO[slot];
+    if (!feed) return;
+
+    const parentSlot = feed.parent;
+    const parentPick = editPicks[parentSlot];
+
+    if (parentPick && parentPick.id === oldTeamId) {
+        delete editPicks[parentSlot];
+        pendingPicks[parentSlot] = null;
+        // Also update ALL_PICKS
+        if (ALL_PICKS[CURRENT_USER_ID]) {
+            delete ALL_PICKS[CURRENT_USER_ID][parentSlot];
+        }
+        cascadeClearMaster(parentSlot, oldTeamId);
+    }
+}
+
+function refreshMyPicks() {
+    // Re-run the My Picks overlay with updated picks
+    clearOverlays();
+    applyMyPicks();
+}
+
+function showSaveBarMaster() {
+    const bar = document.getElementById('master-save-bar');
+    if (bar) {
+        bar.style.display = hasChanges ? 'flex' : 'none';
+        document.getElementById('master-save-status').textContent = 'Unsaved changes';
+        document.getElementById('master-save-status').className = 'status unsaved';
+    }
+}
+
+function hideSaveBarMaster() {
+    const bar = document.getElementById('master-save-bar');
+    if (bar) bar.style.display = 'none';
+}
+
+function closeMasterSaveModal() {
+    document.getElementById('master-save-modal').style.display = 'none';
+}
+
+async function savePicksMaster() {
+    const btn = document.getElementById('master-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const toSave = {};
+    for (const [slot, team] of Object.entries(editPicks)) {
+        if (phaseForSlot(slot) === 2 && team) {
+            toSave[slot] = team.id;
+        }
+    }
+    // Include pending deletes
+    for (const [slot, val] of Object.entries(pendingPicks)) {
+        if (val === null && phaseForSlot(slot) === 2) {
+            delete toSave[slot];
+        }
+    }
+
+    try {
+        const resp = await fetch('/bracket/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ picks: toSave, phase: 2 }),
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            hasChanges = false;
+            pendingPicks = {};
+            document.getElementById('master-save-status').innerHTML = '<span style="color: var(--green);">Saved</span>';
+            document.getElementById('master-save-status').className = 'status';
+        } else {
+            document.getElementById('master-save-status').textContent = data.error || 'Save failed';
+            document.getElementById('master-save-status').className = 'status unsaved';
+        }
+    } catch (e) {
+        document.getElementById('master-save-status').textContent = 'Network error';
+        document.getElementById('master-save-status').className = 'status unsaved';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Rest of the Way';
+    }
 }
 </script>
 {% endblock %}
