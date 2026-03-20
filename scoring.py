@@ -94,6 +94,9 @@ def calculate_user_score(user_id):
 def calculate_leaderboard():
     """Calculate scores for all users and return sorted leaderboard."""
     users = User.query.all()
+    total_graded = GameResult.query.filter(
+        GameResult.winner_id.isnot(None)
+    ).count()
     board = []
     for user in users:
         score = calculate_user_score(user.id)
@@ -114,6 +117,7 @@ def calculate_leaderboard():
             "e8": pr.get("e8", {}).get("points", 0) + pr.get("e8", {}).get("bonus", 0),
             "f4": pr.get("f4", {}).get("points", 0) + pr.get("f4", {}).get("bonus", 0),
             "championship": pr.get("championship", {}).get("points", 0) + pr.get("championship", {}).get("bonus", 0),
+            "total_graded": total_graded,
         })
     # Sort by total descending, then alphabetical by name for tiebreaker
     board.sort(key=lambda x: (-x["total"], x["name"].lower()))

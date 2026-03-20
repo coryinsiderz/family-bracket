@@ -14,6 +14,7 @@
                     <th>Name</th>
                     {% if not locked %}
                     <th class="text-right total">Total</th>
+                    <th class="text-right round-col">Record</th>
                     <th class="text-right round-col">R64</th>
                     <th class="text-right round-col">R32</th>
                     <th class="text-right round-col">S16</th>
@@ -33,6 +34,7 @@
                     <td class="name-col">{{ entry.name }}</td>
                     {% if not locked %}
                     <td class="text-right total">{{ entry.total }}</td>
+                    <td class="text-right round-col">{{ entry.correct_picks }}/{{ entry.total_graded }}</td>
                     <td class="text-right round-col">{{ entry.r64 or '' }}</td>
                     <td class="text-right round-col">{{ entry.r32 or '' }}</td>
                     <td class="text-right round-col">{{ entry.s16 or '' }}</td>
