@@ -94,9 +94,13 @@ def calculate_user_score(user_id):
 def calculate_leaderboard():
     """Calculate scores for all users and return sorted leaderboard."""
     users = User.query.all()
-    total_graded = GameResult.query.filter(
+    # Count graded games excluding First Four (FF games don't score)
+    all_graded = GameResult.query.filter(
         GameResult.winner_id.isnot(None)
-    ).count()
+    ).all()
+    total_graded = sum(
+        1 for r in all_graded if get_round_for_slot(r.game_slot) != 'ff'
+    )
     board = []
     for user in users:
         score = calculate_user_score(user.id)
