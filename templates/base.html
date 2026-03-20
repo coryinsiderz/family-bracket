@@ -14,6 +14,7 @@
             <span class="title">Baltz Bracket</span>
             <a href="{{ url_for('master_bracket') }}" class="{{ 'active' if request.endpoint == 'master_bracket' }}">Bracket</a>
             <a href="{{ url_for('leaderboard') }}" class="{{ 'active' if request.endpoint == 'leaderboard' }}">Leaderboard</a>
+            <a href="{{ url_for('rules') }}" class="{{ 'active' if request.endpoint == 'rules' }}">Rules</a>
         </div>
         <div class="right">
             {% if session.get('guest') and not session.get('user_id') %}

@@ -462,6 +462,12 @@ def save_picks():
 
 # --- Leaderboard ---
 
+@app.route("/rules")
+@login_required
+def rules():
+    return render_template("rules.html", user=get_current_user())
+
+
 @app.route("/leaderboard")
 @login_required
 def leaderboard():
