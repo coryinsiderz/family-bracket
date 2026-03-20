@@ -948,8 +948,8 @@ function applyLeverage() {
     let parts = [];
     if (remainingGames > 0) parts.push(`Leverage remaining: <strong>${totalRemainingGain.toFixed(1)}</strong> pts across ${remainingGames} games`);
     parts.push(`Earned: <strong>${earnedSign}${earnedLev.toFixed(1)}</strong> vs field`);
-    parts.push(`<span style="color:var(--text-dim); font-size:11px;">Click any game for details</span>`);
-    summaryEl.innerHTML = parts.join(' | ');
+    summaryEl.innerHTML = parts.join(' | ')
+        + `<br><span style="color:var(--text-dim); font-size:11px;">Brighter = higher stakes. Green = you gained, Red = you lost, White = upcoming. Click any team for details.</span>`;
 }
 
 // Render one feeder game section for the leverage modal.
