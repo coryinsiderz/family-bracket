@@ -34,7 +34,7 @@
                     <td class="name-col">{{ entry.name }}</td>
                     {% if not locked %}
                     <td class="text-right total">{{ entry.total }}</td>
-                    <td class="text-right round-col">{{ entry.correct_picks }}/{{ entry.total_graded }}</td>
+                    <td class="text-right round-col">{{ entry.correct_picks }}-{{ entry.total_graded - entry.correct_picks }}</td>
                     <td class="text-right round-col">{{ entry.r64 or '' }}</td>
                     <td class="text-right round-col">{{ entry.r32 or '' }}</td>
                     <td class="text-right round-col">{{ entry.s16 or '' }}</td>
