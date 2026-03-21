@@ -924,7 +924,7 @@ function applyLeverage() {
     if (maxSwing > 0) {
         for (const { el, totalSwing } of upcomingTeams) {
             if (totalSwing === 0) continue;
-            const intensity = 0.05 + (totalSwing / maxSwing) * 0.90;
+            const intensity = 0.05 + Math.sqrt(totalSwing / maxSwing) * 0.90;
             el.style.background = `rgba(255, 255, 255, ${intensity.toFixed(3)})`;
         }
     }
@@ -933,7 +933,7 @@ function applyLeverage() {
     const maxAbsEarned = completedTeams.reduce((m, t) => Math.max(m, Math.abs(t.earned)), 0);
     if (maxAbsEarned > 0) {
         for (const { el, earned } of completedTeams) {
-            const intensity = 0.05 + (Math.abs(earned) / maxAbsEarned) * 0.90;
+            const intensity = 0.05 + Math.sqrt(Math.abs(earned) / maxAbsEarned) * 0.90;
             if (earned >= 0) {
                 el.style.background = `rgba(76, 175, 80, ${intensity.toFixed(3)})`;
             } else {
