@@ -479,7 +479,18 @@ function injectProjectedPicks(userId) {
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
             if (feederSlot) proj.dataset.feederSlot = feederSlot;
-            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
+            // Include score if this slot's game has a result
+            let scoreHtml = '';
+            const slotResult = RESULTS[targetSlot];
+            if (slotResult && slotResult.score_team1 != null) {
+                // Determine if this team is team1 or team2 in the result
+                if (slotResult.team1_id === teamId) {
+                    scoreHtml = `<span class="score">${slotResult.score_team1}</span>`;
+                } else if (slotResult.team2_id === teamId) {
+                    scoreHtml = `<span class="score">${slotResult.score_team2}</span>`;
+                }
+            }
+            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>${scoreHtml}`;
             tbd.parentNode.insertBefore(proj, tbd);
             break;
         }
@@ -586,6 +597,24 @@ function injectUserBracket(userId, prefix) {
             proj.dataset.seed = team.seed;
             proj.dataset.name = team.name;
             proj.dataset.feederSlot = feederSlot;
+            // Build score HTML from stored result or live data
+            let projScoreHtml = '';
+            const slotResult = RESULTS[slot];
+            const slotLive = LIVE_DATA[slot];
+            if (slotResult && slotResult.score_team1 != null) {
+                if (slotResult.team1_id === feederPick) {
+                    projScoreHtml = `<span class="score">${slotResult.score_team1}</span>`;
+                } else if (slotResult.team2_id === feederPick) {
+                    projScoreHtml = `<span class="score">${slotResult.score_team2}</span>`;
+                }
+            } else if (slotLive && slotLive.team1_score != null) {
+                const liveClass = slotLive.status === 'in_progress' ? 'score live-score' : 'score';
+                if (slotLive.team1_id === feederPick) {
+                    projScoreHtml = `<span class="${liveClass}">${slotLive.team1_score}</span>`;
+                } else if (slotLive.team2_id === feederPick) {
+                    projScoreHtml = `<span class="${liveClass}">${slotLive.team2_score}</span>`;
+                }
+            }
             // Make S16+ clickable when phase 2 is open and viewing own picks
             const isEditable = PHASE2_OPEN && !IS_GUEST && userId === CURRENT_USER_ID && phaseForSlot(slot) === 2;
             if (isEditable) {
@@ -597,7 +626,7 @@ function injectUserBracket(userId, prefix) {
                     proj.classList.add('picked');
                 }
             }
-            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>`;
+            proj.innerHTML = `<span class="seed">${team.seed}</span><span class="name">${team.name}</span>${projScoreHtml}`;
             gameEl.appendChild(proj);
         }
     }
@@ -892,13 +921,12 @@ function applyLeverage() {
         }
     });
 
-    // Pass 1: compute leverage per projected team element
+    // Pass 1: compute leverage per team element (projected AND server-rendered)
     const completedTeams = [];  // { el, earned }
     const upcomingTeams = [];   // { el, totalSwing }
     const seenFeeders = new Set();
 
-    document.querySelectorAll('.master-projected[data-feeder-slot]').forEach(el => {
-        const feederSlot = el.dataset.feederSlot;
+    function processTeamEl(el, feederSlot) {
         const lev = computeFeederLeverage(feederSlot, playerIds, eliminated);
 
         if (lev.type === 'completed') {
@@ -917,6 +945,27 @@ function applyLeverage() {
         }
 
         el.style.cursor = 'pointer';
+    }
+
+    // Process projected elements (have data-feeder-slot)
+    document.querySelectorAll('.master-projected[data-feeder-slot]').forEach(el => {
+        processTeamEl(el, el.dataset.feederSlot);
+    });
+
+    // Process server-rendered teams in R32+ games (not projected, but have feeders via PROGRESSION)
+    document.querySelectorAll('.master-game').forEach(gameEl => {
+        const slot = gameEl.dataset.slot;
+        if (!slot || getRoundForSlot(slot) === 'r64') return;
+        const feeders = PROGRESSION[slot];
+        if (!feeders) return;
+        const teamEls = gameEl.querySelectorAll('.master-team:not(.master-projected):not(.master-tbd)');
+        teamEls.forEach((el, idx) => {
+            const feederSlot = feeders[idx];
+            if (!feederSlot) return;
+            // Skip if already processed as projected
+            if (el.classList.contains('master-projected')) return;
+            processTeamEl(el, feederSlot);
+        });
     });
 
     // Blend an overlay color with the base background (#111 = 17,17,17)
