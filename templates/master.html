@@ -919,13 +919,22 @@ function applyLeverage() {
         el.style.cursor = 'pointer';
     });
 
+    // Blend an overlay color with the base background (#111 = 17,17,17)
+    function solidBlend(r, g, b, intensity) {
+        const br = 17, bg = 17, bb = 17;
+        const sr = Math.round(br + (r - br) * intensity);
+        const sg = Math.round(bg + (g - bg) * intensity);
+        const sb = Math.round(bb + (b - bb) * intensity);
+        return `rgb(${sr}, ${sg}, ${sb})`;
+    }
+
     // Pass 2: shade upcoming teams (white gradient)
     const maxSwing = upcomingTeams.reduce((m, t) => Math.max(m, t.totalSwing), 0);
     if (maxSwing > 0) {
         for (const { el, totalSwing } of upcomingTeams) {
             if (totalSwing === 0) continue;
             const intensity = 0.05 + Math.sqrt(totalSwing / maxSwing) * 0.90;
-            el.style.background = `rgba(255, 255, 255, ${intensity.toFixed(3)})`;
+            el.style.background = solidBlend(255, 255, 255, intensity);
         }
     }
 
@@ -935,9 +944,9 @@ function applyLeverage() {
         for (const { el, earned } of completedTeams) {
             const intensity = 0.05 + Math.sqrt(Math.abs(earned) / maxAbsEarned) * 0.90;
             if (earned >= 0) {
-                el.style.background = `rgba(76, 175, 80, ${intensity.toFixed(3)})`;
+                el.style.background = solidBlend(76, 175, 80, intensity);
             } else {
-                el.style.background = `rgba(244, 67, 54, ${intensity.toFixed(3)})`;
+                el.style.background = solidBlend(244, 67, 54, intensity);
             }
         }
     }
@@ -950,8 +959,6 @@ function applyLeverage() {
     lines.push(`<strong style="font-size:13px;">Leverage Remaining</strong>`);
     if (remainingGames > 0) lines.push(`${totalRemainingGain.toFixed(1)} pts across ${remainingGames} games`);
     lines.push(`Earned: ${earnedSign}${earnedLev.toFixed(1)} vs field`);
-    const shadedCount = upcomingTeams.filter(t => t.totalSwing > 0).length + completedTeams.length;
-    lines.push(`<span style="color:var(--text-dim); font-size:11px;">Shaded: ${shadedCount} teams</span>`);
     summaryEl.innerHTML = lines.join('<br>');
 }
 
