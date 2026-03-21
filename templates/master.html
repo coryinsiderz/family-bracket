@@ -950,6 +950,8 @@ function applyLeverage() {
     lines.push(`<strong style="font-size:13px;">Leverage Remaining</strong>`);
     if (remainingGames > 0) lines.push(`${totalRemainingGain.toFixed(1)} pts across ${remainingGames} games`);
     lines.push(`Earned: ${earnedSign}${earnedLev.toFixed(1)} vs field`);
+    const shadedCount = upcomingTeams.filter(t => t.totalSwing > 0).length + completedTeams.length;
+    lines.push(`<span style="color:var(--text-dim); font-size:11px;">Shaded: ${shadedCount} teams</span>`);
     summaryEl.innerHTML = lines.join('<br>');
 }
 

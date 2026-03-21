@@ -31,6 +31,7 @@ PHASE2_LOCK = datetime(2026, 3, 26, 12, 0, 0, tzinfo=ET)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:///bracket.db"
 )
@@ -241,6 +242,7 @@ def login():
         if action == "guest":
             session["guest"] = True
             session.pop("user_id", None)
+            session.permanent = True
             return redirect(url_for("master_bracket"))
 
         if action == "claim":
@@ -272,6 +274,7 @@ def login():
 
             session["user_id"] = user.id
             session.pop("guest", None)
+            session.permanent = True
             return redirect(url_for("master_bracket"))
 
         if action == "login":
@@ -285,6 +288,7 @@ def login():
 
             session["user_id"] = user.id
             session.pop("guest", None)
+            session.permanent = True
             return redirect(url_for("master_bracket"))
 
     unclaimed = User.query.filter_by(password_hash="").all()
