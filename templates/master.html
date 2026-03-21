@@ -598,13 +598,22 @@ function injectUserBracket(userId, prefix) {
             proj.dataset.name = team.name;
             proj.dataset.feederSlot = feederSlot;
             // Build score HTML from stored result or live data
+            // When user's pick is eliminated, the actual team playing may differ —
+            // use the feeder position (team1 = feeder[0], team2 = feeder[1]) to find the right score
             let projScoreHtml = '';
             const slotResult = RESULTS[slot];
             const slotLive = LIVE_DATA[slot];
+            const feedersForSlot = PROGRESSION[slot];
+            const feederIdx = feedersForSlot ? feedersForSlot.indexOf(feederSlot) : -1;
             if (slotResult && slotResult.score_team1 != null) {
                 if (slotResult.team1_id === feederPick) {
                     projScoreHtml = `<span class="score">${slotResult.score_team1}</span>`;
                 } else if (slotResult.team2_id === feederPick) {
+                    projScoreHtml = `<span class="score">${slotResult.score_team2}</span>`;
+                } else if (feederIdx === 0) {
+                    // User's pick eliminated — use the actual team1's score from this position
+                    projScoreHtml = `<span class="score">${slotResult.score_team1}</span>`;
+                } else if (feederIdx === 1) {
                     projScoreHtml = `<span class="score">${slotResult.score_team2}</span>`;
                 }
             } else if (slotLive && slotLive.team1_score != null) {
@@ -612,6 +621,10 @@ function injectUserBracket(userId, prefix) {
                 if (slotLive.team1_id === feederPick) {
                     projScoreHtml = `<span class="${liveClass}">${slotLive.team1_score}</span>`;
                 } else if (slotLive.team2_id === feederPick) {
+                    projScoreHtml = `<span class="${liveClass}">${slotLive.team2_score}</span>`;
+                } else if (feederIdx === 0) {
+                    projScoreHtml = `<span class="${liveClass}">${slotLive.team1_score}</span>`;
+                } else if (feederIdx === 1) {
                     projScoreHtml = `<span class="${liveClass}">${slotLive.team2_score}</span>`;
                 }
             }
