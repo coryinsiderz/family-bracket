@@ -996,6 +996,7 @@ function applyLeverage() {
         const color = solidBlend(r, g, b, intensity);
         el.style.setProperty('--lev-bg', color);
         el.classList.add('lev-shaded');
+        void el.offsetHeight; // force Safari to repaint
     }
 
     // Pass 2: shade upcoming teams (white gradient)
