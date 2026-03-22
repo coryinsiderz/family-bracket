@@ -426,7 +426,8 @@ function clearOverlays() {
         el.style.cursor = '';
     });
     document.querySelectorAll('.master-team').forEach(el => {
-        el.style.backgroundColor = '';
+        el.classList.remove('lev-shaded');
+        el.style.removeProperty('--lev-bg');
         el.style.cursor = '';
     });
     // Remove injected projected picks
@@ -990,13 +991,20 @@ function applyLeverage() {
         return `rgb(${sr}, ${sg}, ${sb})`;
     }
 
+    // Helper: apply shading via CSS class + custom property (Safari compatibility)
+    function applyLevShade(el, r, g, b, intensity) {
+        const color = solidBlend(r, g, b, intensity);
+        el.style.setProperty('--lev-bg', color);
+        el.classList.add('lev-shaded');
+    }
+
     // Pass 2: shade upcoming teams (white gradient)
     const maxSwing = upcomingTeams.reduce((m, t) => Math.max(m, t.totalSwing), 0);
     if (maxSwing > 0) {
         for (const { el, totalSwing } of upcomingTeams) {
             if (totalSwing === 0) continue;
             const intensity = 0.05 + Math.sqrt(totalSwing / maxSwing) * 0.90;
-            el.style.backgroundColor = solidBlend(255, 255, 255, intensity);
+            applyLevShade(el, 255, 255, 255, intensity);
         }
     }
 
@@ -1006,9 +1014,9 @@ function applyLeverage() {
         for (const { el, earned } of completedTeams) {
             const intensity = 0.05 + Math.sqrt(Math.abs(earned) / maxAbsEarned) * 0.90;
             if (earned >= 0) {
-                el.style.backgroundColor = solidBlend(76, 175, 80, intensity);
+                applyLevShade(el, 76, 175, 80, intensity);
             } else {
-                el.style.backgroundColor = solidBlend(244, 67, 54, intensity);
+                applyLevShade(el, 244, 67, 54, intensity);
             }
         }
     }

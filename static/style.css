@@ -763,6 +763,7 @@ button:disabled {
     opacity: 1 !important;
 }
 .pick-eliminated .name { text-decoration: line-through; opacity: 0.6; }
+.lev-shaded { background-color: var(--lev-bg) !important; }
 .vs-player-label { color: #ffa000; font-weight: 600; }
 
 /* Leverage modal */
