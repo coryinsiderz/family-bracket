@@ -426,7 +426,7 @@ function clearOverlays() {
         el.style.cursor = '';
     });
     document.querySelectorAll('.master-team').forEach(el => {
-        el.style.background = '';
+        el.style.backgroundColor = '';
         el.style.cursor = '';
     });
     // Remove injected projected picks
@@ -996,7 +996,7 @@ function applyLeverage() {
         for (const { el, totalSwing } of upcomingTeams) {
             if (totalSwing === 0) continue;
             const intensity = 0.05 + Math.sqrt(totalSwing / maxSwing) * 0.90;
-            el.style.background = solidBlend(255, 255, 255, intensity);
+            el.style.backgroundColor = solidBlend(255, 255, 255, intensity);
         }
     }
 
@@ -1006,9 +1006,9 @@ function applyLeverage() {
         for (const { el, earned } of completedTeams) {
             const intensity = 0.05 + Math.sqrt(Math.abs(earned) / maxAbsEarned) * 0.90;
             if (earned >= 0) {
-                el.style.background = solidBlend(76, 175, 80, intensity);
+                el.style.backgroundColor = solidBlend(76, 175, 80, intensity);
             } else {
-                el.style.background = solidBlend(244, 67, 54, intensity);
+                el.style.backgroundColor = solidBlend(244, 67, 54, intensity);
             }
         }
     }

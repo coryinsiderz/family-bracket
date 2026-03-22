@@ -615,6 +615,20 @@ def admin():
                 db.session.commit()
                 flash(f"Created user '{name}'")
 
+        elif action == "rename_user":
+            user_id = int(request.form.get("user_id"))
+            new_name = request.form.get("new_name", "").strip()
+            user = User.query.get(user_id)
+            if not new_name:
+                flash("Name cannot be empty.")
+            elif User.query.filter(db.func.lower(User.name) == new_name.lower(), User.id != user_id).first():
+                flash(f"The name '{new_name}' is already taken.")
+            elif user:
+                old_name = user.name
+                user.name = new_name
+                db.session.commit()
+                flash(f"Renamed '{old_name}' to '{new_name}'")
+
         elif action == "reset_password":
             user_id = int(request.form.get("user_id"))
             new_pw = request.form.get("new_password", "").strip()
