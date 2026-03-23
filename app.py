@@ -2,6 +2,8 @@ import os
 import logging
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
 
 from flask import (
     Flask, render_template, request, redirect, url_for,

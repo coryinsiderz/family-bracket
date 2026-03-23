@@ -458,9 +458,16 @@ function applyOverlay(mode) {
         if (PHASE2_OPEN && !IS_GUEST && VIEWING_USER_ID === CURRENT_USER_ID) {
             initEditPicks();
             controlsEl.style.display = '';
-            controlsEl.innerHTML = '<button class="master-toggle" id="make-picks-btn" onclick="toggleMakePicks()">Make Picks</button>';
+            controlsEl.innerHTML = `
+                <div style="display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
+                    <button class="master-toggle" id="view-picks-btn" onclick="setPicksMode('view')" style="border:none;border-radius:0;margin:0;font-size:12px;padding:4px 12px;">View Picks</button>
+                    <button class="master-toggle active" id="make-picks-btn" onclick="setPicksMode('make')" style="border:none;border-radius:0;margin:0;font-size:12px;padding:4px 12px;">Make Picks</button>
+                </div>`;
+            isEditingPicks = true;
+            applyMakePicks();
+        } else {
+            applyMyPicks();
         }
-        applyMyPicks();
     }
     if (mode === 'leverage') applyLeverage();
     if (mode === 'vs') applyVsPlayer();
@@ -468,6 +475,16 @@ function applyOverlay(mode) {
 }
 
 function clearOverlays() {
+    // Restore master-winner/master-loser classes (may have been stripped by Results/Make Picks)
+    document.querySelectorAll('.master-team[data-orig-winner]').forEach(el => {
+        el.classList.add('master-winner');
+        el.removeAttribute('data-orig-winner');
+    });
+    document.querySelectorAll('.master-team[data-orig-loser]').forEach(el => {
+        el.classList.add('master-loser');
+        el.removeAttribute('data-orig-loser');
+    });
+
     document.querySelectorAll('.master-team').forEach(el => {
         el.classList.remove('overlay-correct', 'overlay-wrong', 'overlay-pending',
                            'overlay-match', 'vs-you', 'vs-them', 'vs-correct', 'vs-wrong', 'vs-diff',
@@ -488,15 +505,19 @@ function clearOverlays() {
         el.style.removeProperty('--lev-bg');
         el.style.cursor = '';
     });
-    // Remove injected projected picks
+    // Remove injected projected picks and edit-mode picks
     document.querySelectorAll('.master-projected').forEach(el => el.remove());
+    document.querySelectorAll('.master-edit-pick').forEach(el => el.remove());
+    // Remove tiebreaker inputs from team elements
+    document.querySelectorAll('.tiebreaker-input').forEach(el => el.remove());
     // Restore hidden TBD elements
     document.querySelectorAll('.master-tbd-hidden').forEach(el => {
         el.classList.remove('master-tbd-hidden');
         el.style.display = '';
     });
-    // Remove tiebreaker UI
+    // Remove tiebreaker UI and champion display
     document.getElementById('tiebreaker-ui')?.remove();
+    document.getElementById('champion-display')?.remove();
     // Remove cloned opponent bracket
     removeOpponentBracket();
 }
@@ -508,7 +529,17 @@ function removeOpponentBracket() {
 
 // === RESULTS OVERLAY ===
 function applyResults() {
-    // Clean bracket with R64+ point annotations on winning teams
+    // Strip winner/loser styling for a clean bracket (mark for restore)
+    document.querySelectorAll('.master-winner').forEach(el => {
+        el.setAttribute('data-orig-winner', '1');
+        el.classList.remove('master-winner');
+    });
+    document.querySelectorAll('.master-loser').forEach(el => {
+        el.setAttribute('data-orig-loser', '1');
+        el.classList.remove('master-loser');
+    });
+
+    // Add point annotations on winning teams
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
         if (!slot) return;
@@ -1711,9 +1742,11 @@ function refreshMyPicks() {
 function showSaveBarMaster() {
     const bar = document.getElementById('master-save-bar');
     if (bar) {
-        bar.style.display = hasChanges ? 'flex' : 'none';
-        document.getElementById('master-save-status').textContent = 'Unsaved changes';
-        document.getElementById('master-save-status').className = 'status unsaved';
+        bar.style.display = 'flex';
+        if (hasChanges) {
+            document.getElementById('master-save-status').textContent = 'Unsaved changes';
+            document.getElementById('master-save-status').className = 'status unsaved';
+        }
     }
 }
 
@@ -1728,17 +1761,19 @@ function closeMasterSaveModal() {
 
 // === MAKE PICKS MODE ===
 
-function toggleMakePicks() {
-    isEditingPicks = !isEditingPicks;
-    const btn = document.getElementById('make-picks-btn');
-    if (isEditingPicks) {
-        btn.classList.add('active');
-        btn.textContent = 'View Picks';
+function setPicksMode(mode) {
+    const viewBtn = document.getElementById('view-picks-btn');
+    const makeBtn = document.getElementById('make-picks-btn');
+    if (mode === 'make') {
+        makeBtn.classList.add('active');
+        viewBtn.classList.remove('active');
+        isEditingPicks = true;
         clearOverlays();
         applyMakePicks();
     } else {
-        btn.classList.remove('active');
-        btn.textContent = 'Make Picks';
+        viewBtn.classList.add('active');
+        makeBtn.classList.remove('active');
+        isEditingPicks = false;
         hideSaveBarMaster();
         clearOverlays();
         applyMyPicks();
@@ -1746,35 +1781,135 @@ function toggleMakePicks() {
 }
 
 function applyMakePicks() {
-    // Show actual results bracket (no projections) with S16+ teams clickable
-    // Add R64+ point annotations (same as Results view)
-    applyResults();
+    // Clean bracket — no overlays, no colors, no shading
+    // Strip winner/loser styling (mark for restore)
+    document.querySelectorAll('.master-winner').forEach(el => {
+        el.setAttribute('data-orig-winner', '1');
+        el.classList.remove('master-winner');
+    });
+    document.querySelectorAll('.master-loser').forEach(el => {
+        el.setAttribute('data-orig-loser', '1');
+        el.classList.remove('master-loser');
+    });
 
-    // Make S16+ teams clickable for picking
+    // Populate user's existing Phase 2 picks into forward slots
+    populateEditPicksIntoDOM();
+
+    // Make S16+ source teams clickable (teams in games with results)
     document.querySelectorAll('.master-game').forEach(gameEl => {
         const slot = gameEl.dataset.slot;
-        if (!slot || phaseForSlot(slot) !== 2) return;
+        if (!slot) return;
+        const rk = getRoundForSlot(slot);
+        // Only make teams in S16+ games clickable (these are the source games)
+        if (rk !== 's16' && rk !== 'e8' && rk !== 'f4' && rk !== 'championship') return;
 
         const teamEls = gameEl.querySelectorAll('.master-team:not(.master-tbd)');
         teamEls.forEach(el => {
             const teamId = parseInt(el.dataset.teamId);
             if (!teamId) return;
-
-            // Only allow picking alive teams
             if (ALIVE_TEAM_IDS.size > 0 && !ALIVE_TEAM_IDS.has(teamId)) return;
 
             el.style.cursor = 'pointer';
-            el.onclick = function() { pickTeamMaster(this); };
-
-            // Mark as picked if already selected
-            if (editPicks[slot] && editPicks[slot].id === teamId) {
-                el.classList.add('picked');
-            }
+            // For edit-picks, the slot they represent is the PARENT slot (el.dataset.slot)
+            // Clicking picks that team to win that parent slot
+            el.onclick = function() { pickTeamForward(slot, teamId); };
         });
     });
 
+    // Show tiebreaker inputs and save bar
     showTiebreakerInputs();
-    showSaveBarMaster();
+    const bar = document.getElementById('master-save-bar');
+    if (bar) bar.style.display = 'flex';
+}
+
+function populateEditPicksIntoDOM() {
+    // For each Phase 2 pick, populate it into the NEXT round's TBD slot
+    // Build slot order from S16 up
+    const phase2SlotOrder = [];
+    const regions = ['east', 'west', 'midwest', 'south'];
+    for (const r of regions) { phase2SlotOrder.push(`${r}_s16_1`, `${r}_s16_2`); }
+    for (const r of regions) { phase2SlotOrder.push(`${r}_e8_1`); }
+    phase2SlotOrder.push('f4_1', 'f4_2', 'championship');
+
+    for (const slot of phase2SlotOrder) {
+        const pick = editPicks[slot];
+        if (!pick) continue;
+
+        // Find the parent slot this pick feeds into
+        const feed = FEEDS_INTO[slot];
+        if (!feed) continue; // championship has no parent
+
+        const parentSlot = feed.parent;
+        const position = feed.position; // 0 = top, 1 = bottom
+        const parentGame = document.getElementById('mgame-' + parentSlot);
+        if (!parentGame) continue;
+
+        // Find the TBD element at this position (count ALL TBDs by DOM order, including hidden)
+        const allTbdEls = parentGame.querySelectorAll('.master-tbd');
+        const targetTbd = allTbdEls[position];
+        if (!targetTbd || targetTbd.classList.contains('master-tbd-hidden')) continue;
+
+        // Hide TBD, insert pick element
+        targetTbd.classList.add('master-tbd-hidden');
+        targetTbd.style.display = 'none';
+        const el = document.createElement('div');
+        el.className = 'game-team master-team master-edit-pick';
+        el.dataset.slot = parentSlot;
+        el.dataset.teamId = pick.id;
+        el.dataset.seed = pick.seed;
+        el.dataset.name = pick.name;
+        el.dataset.sourceSlot = slot; // which slot this pick came from
+        el.innerHTML = `<span class="seed">${pick.seed}</span><span class="name">${pick.name}</span><span class="clear-pick" onclick="clearPickMaster('${slot}', event)">×</span>`;
+        targetTbd.parentNode.insertBefore(el, targetTbd);
+    }
+
+    // Championship winner — show in a Champion display box
+    showChampionDisplay();
+}
+
+function pickTeamForward(sourceSlot, teamId) {
+    // User clicked a team in sourceSlot — this picks that team to WIN sourceSlot
+    const team = TEAMS[teamId];
+    if (!team) return;
+
+    const oldPick = editPicks[sourceSlot];
+
+    // If clicking already-picked team, unpick
+    if (oldPick && oldPick.id === teamId) {
+        clearPickMaster(sourceSlot);
+        return;
+    }
+
+    // Set new pick
+    editPicks[sourceSlot] = { id: teamId, name: team.name, seed: team.seed };
+    pendingPicks[sourceSlot] = teamId;
+    if (!ALL_PICKS[CURRENT_USER_ID]) ALL_PICKS[CURRENT_USER_ID] = {};
+    ALL_PICKS[CURRENT_USER_ID][sourceSlot] = teamId;
+
+    // Cascade-clear downstream if pick changed
+    if (oldPick && oldPick.id !== teamId) {
+        cascadeClearMaster(sourceSlot, oldPick.id);
+    }
+
+    hasChanges = true;
+    clearOverlays();
+    applyMakePicks();
+}
+
+function clearPickMaster(slot, event) {
+    if (event) event.stopPropagation();
+    const oldPick = editPicks[slot];
+    if (oldPick) {
+        cascadeClearMaster(slot, oldPick.id);
+    }
+    delete editPicks[slot];
+    pendingPicks[slot] = null;
+    if (ALL_PICKS[CURRENT_USER_ID]) {
+        delete ALL_PICKS[CURRENT_USER_ID][slot];
+    }
+    hasChanges = true;
+    clearOverlays();
+    applyMakePicks();
 }
 
 // === TIEBREAKER INPUTS ===
@@ -1784,26 +1919,25 @@ function showTiebreakerInputs() {
     const champEl = document.getElementById('mgame-championship');
     if (!champEl) return;
 
-    const div = document.createElement('div');
-    div.id = 'tiebreaker-ui';
-    div.style.cssText = 'padding: 6px 8px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim);';
-    div.innerHTML = `
-        <div style="margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Tiebreaker: Predicted Total Score</div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="number" id="tb-team1" min="0" max="200"
-                   style="width: 50px; padding: 4px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; border-radius: 3px;"
-                   value="${tiebreakerTeam1 !== null ? tiebreakerTeam1 : ''}"
-                   placeholder="—"
-                   oninput="onTiebreakerChange()">
-            <span>-</span>
-            <input type="number" id="tb-team2" min="0" max="200"
-                   style="width: 50px; padding: 4px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; border-radius: 3px;"
-                   value="${tiebreakerTeam2 !== null ? tiebreakerTeam2 : ''}"
-                   placeholder="—"
-                   oninput="onTiebreakerChange()">
-        </div>
-    `;
-    champEl.appendChild(div);
+    // Add small score inputs next to each team in the championship game
+    const teamEls = champEl.querySelectorAll('.master-team:not(.master-tbd)');
+    const values = [tiebreakerTeam1, tiebreakerTeam2];
+    teamEls.forEach((el, idx) => {
+        if (idx > 1) return;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = `tb-team${idx+1}`;
+        input.className = 'tiebreaker-input';
+        input.min = '0';
+        input.max = '200';
+        input.placeholder = '0';
+        input.value = values[idx] !== null ? values[idx] : '';
+        input.style.cssText = 'width:36px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:11px;border-radius:3px;margin-left:auto;';
+        input.oninput = onTiebreakerChange;
+        input.onclick = function(e) { e.stopPropagation(); };
+        input.onmousedown = function(e) { e.stopPropagation(); };
+        el.appendChild(input);
+    });
 }
 
 function onTiebreakerChange() {
@@ -1812,7 +1946,30 @@ function onTiebreakerChange() {
     tiebreakerTeam1 = tb1 && tb1.value !== '' ? parseInt(tb1.value) : null;
     tiebreakerTeam2 = tb2 && tb2.value !== '' ? parseInt(tb2.value) : null;
     hasChanges = true;
-    showSaveBarMaster();
+    document.getElementById('master-save-status').textContent = 'Unsaved changes';
+    document.getElementById('master-save-status').className = 'status unsaved';
+}
+
+function showChampionDisplay() {
+    document.getElementById('champion-display')?.remove();
+    const champPick = editPicks['championship'];
+    if (!champPick) return;
+
+    const champGame = document.getElementById('mgame-championship');
+    if (!champGame) return;
+
+    const div = document.createElement('div');
+    div.id = 'champion-display';
+    div.style.cssText = 'text-align:center; padding:8px; margin-top:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg-surface);';
+    div.innerHTML = `
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:4px;">Champion</div>
+        <div style="font-size:14px; font-weight:600;">
+            <span style="color:var(--text-dim); margin-right:4px;">${champPick.seed}</span>
+            ${champPick.name}
+            <span class="clear-pick" onclick="clearPickMaster('championship', event)" style="margin-left:8px; font-size:16px;">×</span>
+        </div>
+    `;
+    champGame.parentNode.insertBefore(div, champGame.nextSibling);
 }
 
 // === CLEAR BRACKET ===
@@ -1823,21 +1980,18 @@ function showClearConfirmMaster() {
 
 function confirmClearMaster() {
     document.getElementById('master-confirm-clear').style.display = 'none';
-    // Clear all phase 2 picks
     for (const slot of Object.keys(editPicks)) {
-        if (phaseForSlot(slot) === 2) {
-            pendingPicks[slot] = null;
-            delete editPicks[slot];
-            if (ALL_PICKS[CURRENT_USER_ID]) {
-                delete ALL_PICKS[CURRENT_USER_ID][slot];
-            }
+        pendingPicks[slot] = null;
+        delete editPicks[slot];
+        if (ALL_PICKS[CURRENT_USER_ID]) {
+            delete ALL_PICKS[CURRENT_USER_ID][slot];
         }
     }
     tiebreakerTeam1 = null;
     tiebreakerTeam2 = null;
     hasChanges = true;
-    refreshMyPicks();
-    showSaveBarMaster();
+    clearOverlays();
+    applyMakePicks();
 }
 
 // === PASTE BRACKET ===

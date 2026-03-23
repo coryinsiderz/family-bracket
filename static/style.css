@@ -969,3 +969,13 @@ button:disabled {
 .gap-16 { gap: 16px; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
+
+/* Tiebreaker inputs — hide spinner buttons */
+.tiebreaker-input::-webkit-outer-spin-button,
+.tiebreaker-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.tiebreaker-input {
+    -moz-appearance: textfield;
+}
