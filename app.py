@@ -426,6 +426,13 @@ def save_picks():
         elif existing:
             db.session.delete(existing)
 
+    # Save tiebreaker scores if provided (phase 2)
+    if phase == 2:
+        tiebreaker = data.get("tiebreaker")
+        if tiebreaker:
+            user.tiebreaker_team1 = tiebreaker.get("team1")
+            user.tiebreaker_team2 = tiebreaker.get("team2")
+
     db.session.commit()
 
     # Verify the commit actually persisted
@@ -780,6 +787,14 @@ with app.app_context():
         db.session.execute(db.text("ALTER TABLE users ADD COLUMN submitted_at TIMESTAMP"))
         db.session.commit()
         logger.info("Added submitted columns to users")
+    except Exception:
+        db.session.rollback()
+    # Migrate: add tiebreaker columns to users if missing
+    try:
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN tiebreaker_team1 INTEGER"))
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN tiebreaker_team2 INTEGER"))
+        db.session.commit()
+        logger.info("Added tiebreaker columns to users")
     except Exception:
         db.session.rollback()
     if Team.query.count() == 0:

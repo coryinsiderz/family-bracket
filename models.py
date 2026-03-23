@@ -13,6 +13,8 @@ class User(db.Model):
     paid = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
     submitted = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
     submitted_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    tiebreaker_team1 = db.Column(db.Integer, nullable=True)
+    tiebreaker_team2 = db.Column(db.Integer, nullable=True)
     picks = db.relationship("Pick", backref="user", lazy=True)
 
     def set_password(self, password):
