@@ -43,7 +43,7 @@
                     <td class="text-right round-col">{{ entry.championship or '' }}</td>
                     <td class="text-right round-col">{{ entry.bonus_points or '' }}</td>
                     {% endif %}
-                    <td class="submitted-col">{{ '✓' if entry.submitted else '' }}</td>
+                    <td class="submitted-col" {% if entry.phase2_submitted %}style="color: var(--green);"{% endif %}>{{ '✓' if entry.submitted else '' }}</td>
                     <td class="paid-col">{{ '✓' if entry.paid else '' }}</td>
                 </tr>
                 {% endfor %}
