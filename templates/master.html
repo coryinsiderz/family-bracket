@@ -1346,6 +1346,8 @@ function renderVsPlayer(opponentId) {
         const slot = gameEl.dataset.slot;
         const rk = getRoundForSlot(slot);
         if (rk === 'ff' || rk === 'r64') return;
+        // Hide S16+ comparisons while Phase 2 is open
+        if (PHASE2_OPEN && rk !== 'r32') return;
 
         const feeders = PROGRESSION[slot];
         if (!feeders) return;
@@ -1591,8 +1593,12 @@ function applyExposure() {
     const controlsEl = document.getElementById('overlay-controls');
     controlsEl.style.display = 'block';
 
+    // Hide S16+ picks from exposure until Phase 2 locks
+    const phase2Rounds = new Set(['s16', 'e8', 'f4', 'championship']);
+
     let html = '';
     for (const round of roundOrder) {
+        if (PHASE2_OPEN && phase2Rounds.has(round.key)) continue;
         // Find all slots for this round
         const slots = [];
         for (const [uid, picks] of Object.entries(ALL_PICKS)) {
