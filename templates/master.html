@@ -48,8 +48,8 @@
     <!-- Toggle bar -->
     <div class="master-toggle-bar">
         <div class="master-toggles">
-            <button class="master-toggle active" data-mode="off">Results</button>
-            <button class="master-toggle" data-mode="picks">{% if is_guest %}Picks{% else %}My Picks{% endif %}</button>
+            <button class="master-toggle active" data-mode="picks">{% if is_guest %}Picks{% else %}My Picks{% endif %}</button>
+            <button class="master-toggle" data-mode="off">Results</button>
             <button class="master-toggle" data-mode="leverage">Leverage</button>
             <button class="master-toggle" data-mode="vs">vs Player</button>
             <button class="master-toggle" data-mode="whatif">What If</button>
@@ -377,7 +377,7 @@ function hasProjectedTeam(userId, slot, teamId) {
 }
 
 // === TOGGLE LOGIC ===
-let activeMode = 'off';
+let activeMode = 'picks';
 
 // Modes that require a selected player's picks
 const PLAYER_MODES = ['picks', 'leverage', 'vs'];
