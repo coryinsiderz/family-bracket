@@ -100,8 +100,9 @@ def get_alive_teams():
     return {t.id: t for t in all_teams if t.id not in eliminated}
 
 
-def build_bracket_state(user_id=None):
-    """Build complete bracket state for rendering."""
+def build_bracket_state(user_id=None, results_only_s16=False):
+    """Build complete bracket state for rendering.
+    If results_only_s16=True, S16+ slots show actual results instead of user picks."""
     teams = {t.id: t for t in Team.query.all()}
     teams_by_name = {t.name: t for t in teams.values()}
     results = {r.game_slot: r for r in GameResult.query.all()}
@@ -169,6 +170,9 @@ def build_bracket_state(user_id=None):
             """Get the team for this position: user's pick if exists, else feeder winner."""
             pick_id = picks.get(feeder_slot)
             feeder_result = results.get(feeder_slot)
+            # For S16+ in results-only mode, skip user picks — show actual results
+            if results_only_s16 and round_key not in ('r32',):
+                pick_id = None
             if pick_id and pick_id in teams:
                 t = teams[pick_id]
                 entry = {"id": t.id, "name": t.name, "seed": t.seed}
@@ -530,7 +534,7 @@ def admin_bracket_edit(user_id):
     if not require_admin():
         return render_template("admin_login.html"), 401
     target = User.query.get_or_404(user_id)
-    state = build_bracket_state(target.id)
+    state = build_bracket_state(target.id, results_only_s16=True)
     alive_teams = get_alive_teams()
     return render_template(
         "bracket.html",

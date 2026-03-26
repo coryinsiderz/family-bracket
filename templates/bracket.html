@@ -524,8 +524,8 @@ REGIONS.forEach(r => {
     }
     PROGRESSION[`${r}_e8_1`] = [`${r}_s16_1`, `${r}_s16_2`];
 });
-PROGRESSION['f4_1'] = ['east_e8_1', 'west_e8_1'];
-PROGRESSION['f4_2'] = ['midwest_e8_1', 'south_e8_1'];
+PROGRESSION['f4_1'] = ['east_e8_1', 'south_e8_1'];
+PROGRESSION['f4_2'] = ['west_e8_1', 'midwest_e8_1'];
 PROGRESSION['championship'] = ['f4_1', 'f4_2'];
 
 // Reverse lookup: child_slot -> { parent, position (0 or 1) }
@@ -556,6 +556,29 @@ document.querySelectorAll('.game-team.picked').forEach(el => {
         };
     }
 });
+
+// For admin edit with results_only_s16: load Phase 2 picks from USER_PICKS
+// (they won't be in the DOM because S16+ shows results, not user picks)
+if (ADMIN_EDIT && USER_PICKS) {
+    for (const [slot, teamId] of Object.entries(USER_PICKS)) {
+        if (phaseForSlot(slot) === 2 && !picks[slot]) {
+            const team = TEAMS_DATA[teamId];
+            if (team) {
+                picks[slot] = { id: teamId, name: team.name, seed: String(team.seed) };
+            }
+        }
+    }
+    // Re-render S16+ slots to show loaded picks propagated forward
+    setTimeout(() => {
+        const regions = ['east', 'south', 'west', 'midwest'];
+        for (const r of regions) {
+            renderGameSlot(`${r}_s16_1`); renderGameSlot(`${r}_s16_2`);
+            renderGameSlot(`${r}_e8_1`);
+        }
+        renderGameSlot('f4_1'); renderGameSlot('f4_2');
+        renderGameSlot('championship');
+    }, 100);
+}
 
 function clearPick(e, slot, teamId) {
     e.stopPropagation();
