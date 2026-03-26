@@ -29,7 +29,7 @@ ET = timezone(timedelta(hours=-4))  # EDT
 # Phase deadlines
 PHASE1_LOCK = datetime(2026, 3, 19, 12, 15, 0, tzinfo=ET)
 PHASE2_UNLOCK = datetime(2026, 3, 23, 4, 20, 0, tzinfo=ET)
-PHASE2_LOCK = datetime(2026, 3, 26, 12, 0, 0, tzinfo=ET)
+PHASE2_LOCK = datetime(2026, 3, 26, 19, 15, 0, tzinfo=ET)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
