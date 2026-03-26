@@ -110,8 +110,7 @@ def calculate_leaderboard():
             "user_id": user.id,
             "name": user.name,
             "paid": user.paid,
-            "submitted": user.submitted,
-            "phase2_submitted": Pick.query.filter(
+            "phase2_complete": Pick.query.filter(
                 Pick.user_id == user.id,
                 db.or_(
                     Pick.game_slot.like('%s16%'),
@@ -119,7 +118,7 @@ def calculate_leaderboard():
                     Pick.game_slot.like('%f4%'),
                     Pick.game_slot.like('%championship%'),
                 )
-            ).first() is not None,
+            ).count() == 15,
             "total": score["total"],
             "round_points": score["round_points"],
             "bonus_points": score["bonus_points"],
