@@ -148,40 +148,43 @@
     {% endfor %}
 
     <!-- Final Four + Championship -->
-    <div class="final-four-section">
-        <div class="region-header">Final Four & Championship</div>
+    <div class="bracket-region final-four-section">
+        <div class="region-header">FINAL FOUR</div>
         <div class="bracket-container">
-            <div class="final-four-grid">
-                <!-- F4 Game 1: East vs South -->
+            <div class="bracket-grid">
+                <!-- F4 Games (like S16 column) -->
                 <div class="bracket-round">
                     <div class="bracket-round-header">Final Four</div>
+                    <div class="bracket-games">
                     {% set slot = 'f4_1' %}
                     {% set game = state.later.get(slot) %}
                     {% if game %}
                         {{ render_game(slot, game, state, 'TBD (East/South)') }}
                     {% endif %}
-                </div>
-
-                <!-- Championship -->
-                <div class="bracket-round">
-                    <div class="bracket-round-header">Championship</div>
-                    {% set slot = 'championship' %}
-                    {% set game = state.later.get(slot) %}
-                    {% if game %}
-                        {{ render_game(slot, game, state) }}
-                    {% endif %}
-                </div>
-
-                <!-- F4 Game 2: West vs Midwest -->
-                <div class="bracket-round">
-                    <div class="bracket-round-header">Final Four</div>
                     {% set slot = 'f4_2' %}
                     {% set game = state.later.get(slot) %}
                     {% if game %}
                         {{ render_game(slot, game, state, 'TBD (West/MW)') }}
                     {% endif %}
+                    </div>
+                </div>
+
+                <!-- Championship (like E8 column) -->
+                <div class="bracket-round">
+                    <div class="bracket-round-header">Championship</div>
+                    <div class="bracket-games">
+                    {% set slot = 'championship' %}
+                    {% set game = state.later.get(slot) %}
+                    {% if game %}
+                        {{ render_game(slot, game, state) }}
+                    {% endif %}
+                    </div>
                 </div>
             </div>
+        </div>
+        <div id="champion-display" style="display:none; text-align:center; margin-top:12px; padding:8px; border:1px solid var(--border); border-radius:4px;">
+            <span style="color:var(--text-dim); font-size:11px; text-transform:uppercase;">Champion</span>
+            <div id="champion-name" style="font-size:16px; font-weight:700; margin-top:4px;"></div>
         </div>
     </div>
     </div>
@@ -517,7 +520,8 @@ function clearOverlays() {
     });
     // Remove tiebreaker UI and champion display
     document.getElementById('tiebreaker-ui')?.remove();
-    document.getElementById('champion-display')?.remove();
+    const champDisplay = document.getElementById('champion-display');
+    if (champDisplay) champDisplay.style.display = 'none';
     // Remove cloned opponent bracket
     removeOpponentBracket();
 }
@@ -1957,25 +1961,22 @@ function onTiebreakerChange() {
 }
 
 function showChampionDisplay() {
-    document.getElementById('champion-display')?.remove();
+    const display = document.getElementById('champion-display');
+    const nameEl = document.getElementById('champion-name');
+    if (!display || !nameEl) return;
+
     const champPick = editPicks['championship'];
-    if (!champPick) return;
+    if (!champPick) {
+        display.style.display = 'none';
+        return;
+    }
 
-    const champGame = document.getElementById('mgame-championship');
-    if (!champGame) return;
-
-    const div = document.createElement('div');
-    div.id = 'champion-display';
-    div.style.cssText = 'text-align:center; padding:8px; margin-top:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg-surface);';
-    div.innerHTML = `
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:4px;">Champion</div>
-        <div style="font-size:14px; font-weight:600;">
-            <span style="color:var(--text-dim); margin-right:4px;">${champPick.seed}</span>
-            ${champPick.name}
-            <span class="clear-pick" onclick="clearPickMaster('championship', event)" style="margin-left:8px; font-size:16px;">×</span>
-        </div>
+    nameEl.innerHTML = `
+        <span style="color:var(--text-dim); margin-right:4px;">${champPick.seed}</span>
+        ${champPick.name}
+        <span class="clear-pick" onclick="clearPickMaster('championship', event)" style="margin-left:8px; font-size:16px;">×</span>
     `;
-    champGame.parentNode.insertBefore(div, champGame.nextSibling);
+    display.style.display = 'block';
 }
 
 // === CLEAR BRACKET ===

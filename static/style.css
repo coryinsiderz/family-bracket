@@ -443,14 +443,6 @@ button:disabled {
     border-top: 1px solid var(--border);
 }
 
-.final-four-grid {
-    display: grid;
-    grid-template-columns: 200px 200px 200px;
-    gap: 0 24px;
-    justify-content: center;
-    max-width: 700px;
-    margin: 0 auto;
-}
 
 /* Leaderboard */
 
@@ -918,11 +910,6 @@ button:disabled {
         gap: 0 12px;
     }
 
-    .final-four-grid {
-        grid-template-columns: 160px 160px 160px;
-        gap: 0 12px;
-    }
-
     .game-team .name {
         font-size: 12px;
     }
@@ -936,10 +923,6 @@ button:disabled {
     .bracket-grid {
         grid-template-columns: 140px 140px;
         gap: 0 8px;
-    }
-
-    .final-four-grid {
-        grid-template-columns: 140px 140px;
     }
 
     nav {
