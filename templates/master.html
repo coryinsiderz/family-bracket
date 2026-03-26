@@ -574,7 +574,7 @@ function injectProjectedPicks(userId) {
 
     // Build slot order: R32 first, then S16, E8, F4, Championship
     const slotOrder = [];
-    const regions = ['east', 'west', 'midwest', 'south'];
+    const regions = ['east', 'south', 'west', 'midwest'];
     for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
     for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
@@ -686,7 +686,7 @@ function injectUserBracket(userId, prefix) {
     prefix = prefix || 'mgame-';
     const picks = ALL_PICKS[userId] || {};
     const slotOrder = [];
-    const regions = ['east', 'west', 'midwest', 'south'];
+    const regions = ['east', 'south', 'west', 'midwest'];
     for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
     for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
@@ -895,7 +895,7 @@ function applyMyPicksTo(userId, prefix) {
     const eliminated = getEliminatedTeams();
 
     const slotOrder = [];
-    const regions = ['east', 'west', 'midwest', 'south'];
+    const regions = ['east', 'south', 'west', 'midwest'];
     for (const r of regions) for (let i = 1; i <= 4; i++) slotOrder.push(`${r}_r32_${i}`);
     for (const r of regions) for (let i = 1; i <= 2; i++) slotOrder.push(`${r}_s16_${i}`);
     for (const r of regions) slotOrder.push(`${r}_e8_1`);
@@ -1832,7 +1832,7 @@ function populateEditPicksIntoDOM() {
     // For each Phase 2 pick, populate it into the NEXT round's TBD slot
     // Build slot order from S16 up
     const phase2SlotOrder = [];
-    const regions = ['east', 'west', 'midwest', 'south'];
+    const regions = ['east', 'south', 'west', 'midwest'];
     for (const r of regions) { phase2SlotOrder.push(`${r}_s16_1`, `${r}_s16_2`); }
     for (const r of regions) { phase2SlotOrder.push(`${r}_e8_1`); }
     phase2SlotOrder.push('f4_1', 'f4_2', 'championship');

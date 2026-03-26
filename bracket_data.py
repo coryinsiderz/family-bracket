@@ -161,7 +161,7 @@ FIRST_FOUR_SLOTS = {
     ("south", 0): "ff_south_16",
 }
 
-REGIONS = ["east", "west", "midwest", "south"]
+REGIONS = ["east", "south", "west", "midwest"]
 
 # Round names and point values
 ROUNDS = {
