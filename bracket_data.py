@@ -198,8 +198,8 @@ for region in REGIONS:
     BRACKET_PROGRESSION[parent] = (child1, child2)
 
 # E8 -> F4
-BRACKET_PROGRESSION["f4_1"] = ("east_e8_1", "west_e8_1")
-BRACKET_PROGRESSION["f4_2"] = ("midwest_e8_1", "south_e8_1")
+BRACKET_PROGRESSION["f4_1"] = ("east_e8_1", "south_e8_1")
+BRACKET_PROGRESSION["f4_2"] = ("west_e8_1", "midwest_e8_1")
 
 # F4 -> Championship
 BRACKET_PROGRESSION["championship"] = ("f4_1", "f4_2")

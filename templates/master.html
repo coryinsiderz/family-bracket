@@ -152,13 +152,13 @@
         <div class="region-header">Final Four & Championship</div>
         <div class="bracket-container">
             <div class="final-four-grid">
-                <!-- F4 Game 1: East vs West -->
+                <!-- F4 Game 1: East vs South -->
                 <div class="bracket-round">
                     <div class="bracket-round-header">Final Four</div>
                     {% set slot = 'f4_1' %}
                     {% set game = state.later.get(slot) %}
                     {% if game %}
-                        {{ render_game(slot, game, state, 'TBD (East/West)') }}
+                        {{ render_game(slot, game, state, 'TBD (East/South)') }}
                     {% endif %}
                 </div>
 
@@ -172,13 +172,13 @@
                     {% endif %}
                 </div>
 
-                <!-- F4 Game 2: Midwest vs South -->
+                <!-- F4 Game 2: West vs Midwest -->
                 <div class="bracket-round">
                     <div class="bracket-round-header">Final Four</div>
                     {% set slot = 'f4_2' %}
                     {% set game = state.later.get(slot) %}
                     {% if game %}
-                        {{ render_game(slot, game, state, 'TBD (MW/South)') }}
+                        {{ render_game(slot, game, state, 'TBD (West/MW)') }}
                     {% endif %}
                 </div>
             </div>
@@ -234,7 +234,7 @@
             <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.6;">
                 Paste 15 lines: S16 (8), E8 (4), F4 (2), Championship (1).<br>
                 Order: East top, East bottom, West top, West bottom, MW top, MW bottom, South top, South bottom.<br>
-                Then E8: East, West, MW, South. Then F4: East/West, MW/South. Then Champion.
+                Then E8: East, West, MW, South. Then F4: East/South, West/MW. Then Champion.
             </div>
             <textarea id="master-paste-textarea" rows="15" style="width: 100%; font-family: var(--font); font-size: 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px; resize: vertical;"></textarea>
             <div class="flex gap-8" style="margin-top: 8px;">
