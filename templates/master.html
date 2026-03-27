@@ -980,24 +980,57 @@ function calcFieldScores(slot, winnerId, winnerSeed, loserSeed, playerIds, usePr
     return { winnerPts, fieldTotal: total, fieldAvg: total / playerIds.length };
 }
 
+// Get all unique teams any user picked to win a given slot.
+// Returns array of { id, name, seed, pickedByCount }
+function getAllPossibleTeams(slot) {
+    const teamMap = {};
+    const playerIds = Object.keys(ALL_PICKS).map(Number);
+    for (const pid of playerIds) {
+        const tid = getUserPickForSlot(pid, slot);
+        if (!tid) continue;
+        if (!teamMap[tid]) {
+            const t = TEAMS[tid];
+            teamMap[tid] = { id: tid, name: t?.name || '?', seed: t?.seed || 0, pickedByCount: 0 };
+        }
+        teamMap[tid].pickedByCount++;
+    }
+    return Object.values(teamMap).sort((a, b) => b.pickedByCount - a.pickedByCount);
+}
+
 // Compute leverage for a single feeder game.
 // Returns { type, earned, totalSwing, gainIfRight, feederSlot } or { type: 'incomplete' }.
 function computeFeederLeverage(feederSlot, playerIds, eliminated) {
     const result = RESULTS[feederSlot];
     const myPick = getUserPickForSlot(VIEWING_USER_ID, feederSlot);
 
-    // Get the two teams in the feeder game
+    // Get all possible teams for this feeder slot (not just DOM teams)
+    const possibleTeams = getAllPossibleTeams(feederSlot);
+
+    // Also include DOM teams in case they're not in anyone's picks
     const feederEl = document.getElementById('mgame-' + feederSlot);
-    const teams = [];
     if (feederEl) {
         feederEl.querySelectorAll('.master-team[data-team-id]').forEach(el => {
             const tid = parseInt(el.dataset.teamId);
-            if (tid) teams.push({ id: tid, seed: parseInt(el.dataset.seed) || 0 });
+            if (tid && !possibleTeams.find(t => t.id === tid)) {
+                const t = TEAMS[tid];
+                possibleTeams.push({ id: tid, name: t?.name || '?', seed: t?.seed || 0, pickedByCount: 0 });
+            }
         });
     }
-    const teamA = teams[0];
-    const teamB = teams[1];
-    if (!teamA || !teamB) return { type: 'incomplete', feederSlot };
+
+    if (possibleTeams.length < 2) {
+        // Fall back to DOM teams
+        const teams = [];
+        if (feederEl) {
+            feederEl.querySelectorAll('.master-team[data-team-id]').forEach(el => {
+                const tid = parseInt(el.dataset.teamId);
+                if (tid) teams.push({ id: tid, seed: parseInt(el.dataset.seed) || 0 });
+            });
+        }
+        if (teams.length < 2) return { type: 'incomplete', feederSlot };
+        possibleTeams.length = 0;
+        teams.forEach(t => possibleTeams.push({ id: t.id, name: TEAMS[t.id]?.name || '?', seed: t.seed, pickedByCount: 0 }));
+    }
 
     if (result && result.winner_id) {
         // Completed feeder
@@ -1009,19 +1042,28 @@ function computeFeederLeverage(feederSlot, playerIds, eliminated) {
         const earned = (iCorrect ? sc.winnerPts : 0) - sc.fieldAvg;
         return { type: 'completed', earned, feederSlot };
     } else {
-        // Upcoming feeder
+        // Upcoming feeder — compute field avg for ALL possible winners
+        const fieldAvgs = [];
+        for (const team of possibleTeams) {
+            // Find any other team to compute upset bonus against (use lowest seed as proxy)
+            const otherTeam = possibleTeams.find(t => t.id !== team.id) || possibleTeams[0];
+            const sc = calcFieldScores(feederSlot, team.id, team.seed, otherTeam.seed, playerIds, false);
+            fieldAvgs.push({ teamId: team.id, fieldAvg: sc.fieldAvg, winnerPts: sc.winnerPts });
+        }
+
+        const maxFieldAvg = Math.max(...fieldAvgs.map(f => f.fieldAvg));
+        const minFieldAvg = Math.min(...fieldAvgs.map(f => f.fieldAvg));
+
         if (myPick && !eliminated.has(myPick)) {
-            const otherTeamId = myPick === teamA.id ? teamB.id : teamA.id;
-            const scWin = calcFieldScores(feederSlot, myPick, getSeed(myPick), getSeed(otherTeamId), playerIds, false);
-            const scLose = calcFieldScores(feederSlot, otherTeamId, getSeed(otherTeamId), getSeed(myPick), playerIds, false);
-            const gainIfRight = scWin.winnerPts - scWin.fieldAvg;
-            const lossIfWrong = scLose.fieldAvg;
-            const totalSwing = gainIfRight + lossIfWrong;
+            const myEntry = fieldAvgs.find(f => f.teamId === myPick);
+            const gainIfRight = myEntry ? myEntry.winnerPts - myEntry.fieldAvg : 0;
+            // Worst case: highest field avg among non-my-pick teams
+            const worstLoss = fieldAvgs.filter(f => f.teamId !== myPick).reduce((m, f) => Math.max(m, f.fieldAvg), 0);
+            const totalSwing = gainIfRight + worstLoss;
             return { type: 'upcoming', totalSwing, gainIfRight, feederSlot };
         } else {
-            const scA = calcFieldScores(feederSlot, teamA.id, teamA.seed, teamB.seed, playerIds, false);
-            const scB = calcFieldScores(feederSlot, teamB.id, teamB.seed, teamA.seed, playerIds, false);
-            const totalSwing = Math.abs(scA.fieldAvg - scB.fieldAvg);
+            // Eliminated or no pick — swing is the range of field avgs
+            const totalSwing = maxFieldAvg - minFieldAvg;
             return { type: 'upcoming', totalSwing, gainIfRight: 0, feederSlot };
         }
     }
@@ -1237,40 +1279,55 @@ function renderFeederSection(feederSlot, playerIds, gameNum) {
         html += `<strong>RESULT: ${TEAMS[winnerId]?.name} won</strong> (${sc.winnerPts} pts: ${roundPts} round${sc.winnerPts > roundPts ? ' + ' + (sc.winnerPts - roundPts) + ' upset bonus' : ''})<br>`;
         html += `You: ${iCorrect ? '+' + sc.winnerPts : '0'} | Field avg: +${sc.fieldAvg.toFixed(1)} | <strong style="color:${netColor}">You ${net >= 0 ? 'gained' : 'lost'} ${netSign}${net.toFixed(1)} on field</strong>`;
         html += `</div>`;
-    } else if (myPick && !myPickEliminated) {
-        // Upcoming with live pick
-        const otherTeam = myPick === teamA.id ? teamB : teamA;
-        const scWin = calcFieldScores(feederSlot, myPick, getSeed(myPick), otherTeam.seed, playerIds, false);
-        const gainIfRight = scWin.winnerPts - scWin.fieldAvg;
-        const scLose = calcFieldScores(feederSlot, otherTeam.id, otherTeam.seed, getSeed(myPick), playerIds, false);
-        const lossIfWrong = scLose.fieldAvg;
-
-        html += `<div style="margin-top: 4px;">`;
-        html += `<div style="color:var(--green)">If <strong>${TEAMS[myPick]?.name}</strong> wins (your pick):<br>`;
-        html += `You: +${scWin.winnerPts} | Field avg: +${scWin.fieldAvg.toFixed(1)} | You gain <strong>+${gainIfRight.toFixed(1)}</strong> on field</div>`;
-        html += `<div style="color:var(--red); margin-top: 4px;">If <strong>${otherTeam.name}</strong> wins:<br>`;
-        html += `You: +0 | Field avg: +${scLose.fieldAvg.toFixed(1)} | You lose <strong>-${lossIfWrong.toFixed(1)}</strong> to field</div>`;
-        if (lossIfWrong > 0) {
-            const ratio = (gainIfRight / lossIfWrong).toFixed(1);
-            html += `<div style="margin-top: 4px; color: var(--text-dim);">Risk/Reward: risking ${lossIfWrong.toFixed(1)} to gain ${gainIfRight.toFixed(1)} (${ratio}:1)</div>`;
-        }
-        html += `</div>`;
     } else {
-        // Eliminated or no pick
-        const scA = calcFieldScores(feederSlot, teamA.id, teamA.seed, teamB.seed, playerIds, false);
-        const scB = calcFieldScores(feederSlot, teamB.id, teamB.seed, teamA.seed, playerIds, false);
+        // Upcoming: show all possible winners
+        const allTeams = getAllPossibleTeams(feederSlot);
+        // Compute field avg for each possible winner
+        const outcomes = allTeams.map(team => {
+            // Use the other most-picked team for upset bonus calc
+            const otherTeam = allTeams.find(t => t.id !== team.id) || team;
+            const sc = calcFieldScores(feederSlot, team.id, team.seed, otherTeam.seed, playerIds, false);
+            const iMine = myPick === team.id;
+            const myPts = iMine ? sc.winnerPts : 0;
+            const net = myPts - sc.fieldAvg;
+            return { ...team, fieldAvg: sc.fieldAvg, winnerPts: sc.winnerPts, myPts, net, isMine: iMine };
+        }).sort((a, b) => b.fieldAvg - a.fieldAvg); // most damaging first
 
         html += `<div style="margin-top: 4px;">`;
-        html += `<div style="color:var(--red)">If <strong>${teamA.name}</strong> wins:<br>`;
-        html += `You: +0 | Field avg: +${scA.fieldAvg.toFixed(1)} | You lose <strong>-${scA.fieldAvg.toFixed(1)}</strong> to field</div>`;
-        html += `<div style="color:var(--red); margin-top: 4px;">If <strong>${teamB.name}</strong> wins:<br>`;
-        html += `You: +0 | Field avg: +${scB.fieldAvg.toFixed(1)} | You lose <strong>-${scB.fieldAvg.toFixed(1)}</strong> to field</div>`;
-        const betterTeam = scA.fieldAvg <= scB.fieldAvg ? teamA : teamB;
-        const betterAvg = Math.min(scA.fieldAvg, scB.fieldAvg);
-        const worseAvg = Math.max(scA.fieldAvg, scB.fieldAvg);
-        if (betterAvg < worseAvg) {
-            html += `<div style="margin-top: 6px; padding: 4px 8px; background: rgba(255,255,255,0.06); border-radius: 3px;">You want: <strong>${betterTeam.name}</strong> <span style="color:var(--text-dim);">(costs you ${betterAvg.toFixed(1)} vs ${worseAvg.toFixed(1)})</span></div>`;
+
+        // Show user's pick outcome first (if they have a live pick)
+        const myOutcome = outcomes.find(o => o.isMine);
+        if (myOutcome && !myPickEliminated) {
+            const gainColor = myOutcome.net >= 0 ? 'var(--green)' : 'var(--red)';
+            const gainSign = myOutcome.net >= 0 ? '+' : '';
+            html += `<div style="color:var(--green); margin-bottom: 6px;">If <strong>${myOutcome.name}</strong> wins (your pick):<br>`;
+            html += `You: +${myOutcome.winnerPts} | Field avg: +${myOutcome.fieldAvg.toFixed(1)} | <strong style="color:${gainColor}">You ${gainSign}${myOutcome.net.toFixed(1)}</strong> on field</div>`;
         }
+
+        // Show all other outcomes
+        const otherOutcomes = outcomes.filter(o => !o.isMine || myPickEliminated);
+        if (otherOutcomes.length > 0) {
+            const label = myOutcome && !myPickEliminated ? 'Other outcomes:' : 'Outcomes:';
+            html += `<div style="margin-top: 4px; font-weight: 600; font-size: 12px; color: var(--text-dim);">${label}</div>`;
+            for (const o of otherOutcomes) {
+                const netColor = o.net >= 0 ? 'var(--green)' : 'var(--red)';
+                const netSign = o.net >= 0 ? '+' : '';
+                html += `<div style="margin: 3px 0; padding: 3px 6px; background: rgba(255,255,255,0.03); border-radius: 3px; font-size: 12px;">`;
+                html += `<strong>(${o.seed}) ${o.name}</strong> <span style="color:var(--text-dim);">[${o.pickedByCount}/${playerIds.length}]</span> `;
+                html += `Field avg: +${o.fieldAvg.toFixed(1)} | <span style="color:${netColor}">You ${netSign}${o.net.toFixed(1)}</span>`;
+                html += `</div>`;
+            }
+        }
+
+        // "You want" line — best outcome for the user
+        const bestOutcome = outcomes.reduce((best, o) => o.net > best.net ? o : best, outcomes[0]);
+        const worstOutcome = outcomes.reduce((worst, o) => o.net < worst.net ? o : worst, outcomes[0]);
+        if (bestOutcome.net !== worstOutcome.net) {
+            html += `<div style="margin-top: 6px; padding: 4px 8px; background: rgba(255,255,255,0.06); border-radius: 3px;">`;
+            html += `You want: <strong>${bestOutcome.name}</strong> <span style="color:var(--text-dim);">(${bestOutcome.net >= 0 ? '+' : ''}${bestOutcome.net.toFixed(1)} vs ${worstOutcome.net >= 0 ? '+' : ''}${worstOutcome.net.toFixed(1)})</span>`;
+            html += `</div>`;
+        }
+
         html += `</div>`;
     }
 
