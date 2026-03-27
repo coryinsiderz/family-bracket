@@ -567,6 +567,8 @@ function applyResults() {
             }
         });
     });
+
+    showChampionDisplay({ fromResult: true });
 }
 
 // Inject the user's projected picks into TBD slots.
@@ -884,6 +886,8 @@ function applyMyPicks() {
     const total = myEntry ? myEntry.total : totalPts;
     const summaryEl = document.getElementById('master-summary');
     summaryEl.innerHTML = `You: <strong>${total} pts</strong> | Rank: <strong>${rank}</strong> of ${BOARD.length} | ${correctCount} correct`;
+
+    showChampionDisplay({ userId: VIEWING_USER_ID });
 }
 
 function getSeed(teamId) {
@@ -1154,6 +1158,8 @@ function applyLeverage() {
     if (remainingGames > 0) lines.push(`${totalRemainingGain.toFixed(1)} pts across ${remainingGames} games`);
     lines.push(`Earned: ${earnedSign}${earnedLev.toFixed(1)} vs field`);
     summaryEl.innerHTML = lines.join('<br>');
+
+    showChampionDisplay({ userId: VIEWING_USER_ID });
 }
 
 // Render one feeder game section for the leverage modal.
@@ -1874,7 +1880,7 @@ function populateEditPicksIntoDOM() {
     }
 
     // Championship winner — show in a Champion display box
-    showChampionDisplay();
+    showChampionDisplay({ editable: true });
 }
 
 function pickTeamForward(sourceSlot, teamId) {
@@ -1960,21 +1966,45 @@ function onTiebreakerChange() {
     document.getElementById('master-save-status').className = 'status unsaved';
 }
 
-function showChampionDisplay() {
+function showChampionDisplay(options = {}) {
+    // options: { editable: bool, userId: int, fromResult: bool }
     const display = document.getElementById('champion-display');
     const nameEl = document.getElementById('champion-name');
     if (!display || !nameEl) return;
 
-    const champPick = editPicks['championship'];
-    if (!champPick) {
+    let champTeam = null;
+
+    if (options.editable && editPicks['championship']) {
+        // Make Picks mode — use editPicks
+        const p = editPicks['championship'];
+        champTeam = { id: p.id, name: p.name, seed: p.seed };
+    } else if (options.fromResult && RESULTS['championship'] && RESULTS['championship'].winner_id) {
+        // Results mode — use actual result
+        const wid = RESULTS['championship'].winner_id;
+        const t = TEAMS[wid];
+        if (t) champTeam = { id: wid, name: t.name, seed: t.seed };
+    } else {
+        // Pick-based — use ALL_PICKS for given user
+        const uid = options.userId || VIEWING_USER_ID;
+        const picks = ALL_PICKS[uid] || {};
+        const tid = picks['championship'];
+        if (tid && TEAMS[tid]) {
+            champTeam = { id: tid, name: TEAMS[tid].name, seed: TEAMS[tid].seed };
+        }
+    }
+
+    if (!champTeam) {
         display.style.display = 'none';
         return;
     }
 
+    const clearBtn = options.editable
+        ? `<span class="clear-pick" onclick="clearPickMaster('championship', event)" style="margin-left:8px; font-size:16px;">×</span>`
+        : '';
     nameEl.innerHTML = `
-        <span style="color:var(--text-dim); margin-right:4px;">${champPick.seed}</span>
-        ${champPick.name}
-        <span class="clear-pick" onclick="clearPickMaster('championship', event)" style="margin-left:8px; font-size:16px;">×</span>
+        <span style="color:var(--text-dim); margin-right:4px;">${champTeam.seed}</span>
+        ${champTeam.name}
+        ${clearBtn}
     `;
     display.style.display = 'block';
 }
