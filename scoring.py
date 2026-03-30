@@ -108,10 +108,8 @@ def calculate_leaderboard():
         pr = score["per_round"]
         champ_pick_name = ''
         champ_p = Pick.query.filter_by(user_id=user.id, game_slot='championship').first()
-        if champ_p:
-            champ_t = Team.query.get(champ_p.team_id)
-            if champ_t:
-                champ_pick_name = champ_t.name
+        if champ_p and champ_p.picked_team:
+            champ_pick_name = champ_p.picked_team.name
         board.append({
             "user_id": user.id,
             "name": user.name,
