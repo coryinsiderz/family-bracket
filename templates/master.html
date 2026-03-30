@@ -1500,6 +1500,27 @@ function renderVsPlayer(opponentId) {
     // Inject opponent's picks into clone and apply My Picks coloring
     injectUserBracket(opponentId, 'mgame-opp-');
     applyMyPicksTo(opponentId, 'mgame-opp-');
+
+    // Show champion picks for both users
+    showChampionDisplay({ userId: VIEWING_USER_ID });
+
+    // Add opponent champion display to cloned bracket
+    const oppChampDisplay = clone.querySelector('#champion-display');
+    if (oppChampDisplay) {
+        oppChampDisplay.id = 'opp-champion-display';
+        const oppNameEl = oppChampDisplay.querySelector('#champion-name');
+        if (oppNameEl) oppNameEl.id = 'opp-champion-name';
+        // Populate opponent champion
+        const oppPicks = ALL_PICKS[opponentId] || {};
+        const oppChampTid = oppPicks['championship'];
+        if (oppChampTid && TEAMS[oppChampTid]) {
+            const t = TEAMS[oppChampTid];
+            oppNameEl.innerHTML = `<span style="color:var(--text-dim); margin-right:4px;">${t.seed}</span>${t.name}`;
+            oppChampDisplay.style.display = 'block';
+        } else {
+            oppChampDisplay.style.display = 'none';
+        }
+    }
 }
 
 // === WHAT IF OVERLAY ===

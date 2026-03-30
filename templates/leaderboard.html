@@ -20,6 +20,7 @@
                     <th class="text-right round-col">S16</th>
                     <th class="text-right round-col">E8</th>
                     <th class="text-right round-col">F4</th>
+                    <th class="round-col" title="Champion Pick">Champ Pick</th>
                     <th class="text-right round-col">Champ</th>
                     <th class="text-right round-col" title="Total Upset Bonus">Bonus</th>
                     {% endif %}
@@ -40,6 +41,7 @@
                     <td class="text-right round-col">{{ entry.s16 or '' }}</td>
                     <td class="text-right round-col">{{ entry.e8 or '' }}</td>
                     <td class="text-right round-col">{{ entry.f4 or '' }}</td>
+                    <td class="round-col" style="font-size:11px; white-space:nowrap;">{{ entry.champ_pick or '' }}</td>
                     <td class="text-right round-col">{{ entry.championship or '' }}</td>
                     <td class="text-right round-col">{{ entry.bonus_points or '' }}</td>
                     {% endif %}

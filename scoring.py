@@ -1,6 +1,6 @@
 """Scoring logic for bracket pool."""
 
-from models import db, Pick, GameResult, User
+from models import db, Pick, GameResult, User, Team
 from bracket_data import ROUNDS, get_round_for_slot
 
 
@@ -119,6 +119,9 @@ def calculate_leaderboard():
                     Pick.game_slot.like('%championship%'),
                 )
             ).count() == 15,
+            "champ_pick": (lambda p: Team.query.get(p.team_id).name if p and Team.query.get(p.team_id) else '')(
+                Pick.query.filter_by(user_id=user.id, game_slot='championship').first()
+            ),
             "total": score["total"],
             "round_points": score["round_points"],
             "bonus_points": score["bonus_points"],
